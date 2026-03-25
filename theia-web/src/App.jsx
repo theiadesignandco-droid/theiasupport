@@ -194,7 +194,8 @@ REGLAS DE CÁLCULO:
 10. Perfiles WPC: cálculo según plano/proyecto, no calculable en forma estándar
 
 RESPUESTA: español argentino, profesional. Mostrá el desarrollo del cálculo.
-Si no tenés la info → {"escalate":true,"question":"<resumen>","reason":"<qué falta>"}
+Si no tenés la info → responde ÚNICAMENTE con este JSON exacto, sin markdown, sin texto extra, sin comillas de código:
+{"escalate":true,"question":"<resumen max 15 palabras>","reason":"<qué falta>"}
 Nunca inventes precios ni specs.`;
 
 const TRAIN_SYS = `Sos un consultor ayudando a cargar la base de conocimiento de THEIA Design & Co (revestimientos WPC, Buenos Aires). Hacé UNA sola pregunta concreta. Temas: precios, stock, importación, formas de pago, descuentos, zonas entrega, diferenciadores. Al final: [KB_UPDATE: <info>]`;
@@ -348,8 +349,10 @@ function ChatCore({ kb, setKb, setAlerts, isAdmin, desde }) {
       const raw = await claudeCall(AGENT_SYS(kb), hist.map(m=>({role:m.role,content:m.content})));
       let content=raw, escalated=false;
       try {
-        const j=JSON.parse(raw.trim());
-        if(j.escalate){ escalated=true; setAlerts(p=>[{id:Date.now(),question:j.question,reason:j.reason,time:nowT()},...p]); sendWhatsApp(j.question,j.reason,desde); content=`No tengo esa información, pero ya le envié un WhatsApp al equipo con tu consulta:\n\n"${j.question}"\n\nTe responden a la brevedad.`; }
+        // Strip markdown code blocks if present
+        const cleaned=raw.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+        const j=JSON.parse(cleaned);
+        if(j.escalate){ escalated=true; setAlerts(p=>[{id:Date.now(),question:j.question,reason:j.reason,time:nowT()},...p]); sendWhatsApp(j.question,j.reason,desde); content=`No tengo esa información en este momento, pero ya le envié un WhatsApp al equipo con tu consulta:\n\n"${j.question}"\n\nTe responden a la brevedad. ¿En qué más puedo ayudarte?`; }
       } catch(_) {}
       setMsgs(p=>[...p,{role:"assistant",content,time:nowT(),escalated}]);
     } catch { setMsgs(p=>[...p,{role:"assistant",content:"Error al procesar. Intentá de nuevo.",time:nowT()}]); }
