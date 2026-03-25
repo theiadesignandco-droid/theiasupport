@@ -399,18 +399,45 @@ function ChatCore({ kb, setKb, setAlerts, isAdmin, desde }) {
 // ─── CALCULADORA ──────────────────────────
 function Calculadora() {
   const [modelo, setModelo] = useState("UH67 Elite");
+  const [modo, setModo] = useState("dim"); // "dim" = ancho×alto, "m2" = metros cuadrados
   const [ancho, setAncho] = useState("");
   const [alto, setAlto] = useState("");
+  const [m2, setM2] = useState("");
   const [desp, setDesp] = useState(10);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  // Los modelos disponibles — sin Perfiles WPC
   const modelosDisp = Object.keys(MODELOS);
 
   const calcular = () => {
     setError("");
-    const w = parseFloat(ancho), h = parseFloat(alto);
+    const mod = MODELOS[modelo];
+    let w, h;
+    if (modo === "m2") {
+      const area = parseFloat(m2);
+      if (!area || area <= 0) { setError("Ingresá los m² a cubrir."); return; }
+      // Estimamos con lado cuadrado para el cálculo de omegas, pero usamos m² directamente
+      w = Math.sqrt(area); h = Math.sqrt(area);
+      // Calculamos tablas directo por m²
+      const tablasM2 = 1 / (mod.largo * mod.anchoUtil);
+      const tablasBase = Math.ceil(area * tablasM2);
+      const tablasConDesp = Math.ceil(tablasBase * (1 + desp/100));
+      const clips = mod.clipsXpieza > 0 ? tablasConDesp * mod.clipsXpieza : 0;
+      let omegaFilas=0, omegaMetros=0, omegaPiezas=0;
+      if (mod.linea !== "interior") {
+        omegaFilas = Math.ceil(w / 0.40) + 1;
+        omegaMetros = +(omegaFilas * h * (1+desp/100)).toFixed(2);
+        omegaPiezas = Math.ceil(omegaMetros / 2.50);
+      }
+      let adhesivoQty=null, adhesivoLabel=null;
+      if (mod.adhesivo) {
+        if (mod.adhesivo.tipo==="listons") { adhesivoQty=Math.ceil(tablasConDesp/mod.adhesivo.cada); adhesivoLabel=`${adhesivoQty} cartucho${adhesivoQty>1?"s":""} (1 cada ${mod.adhesivo.cada} tablas)`; }
+        else { adhesivoQty=Math.ceil(tablasConDesp*mod.adhesivo.por); adhesivoLabel=`${adhesivoQty} cartucho${adhesivoQty>1?"s":""} (${mod.adhesivo.por} por placa)`; }
+      }
+      setResult({ modo:"m2", area, m2txt:area.toFixed(2), tablasBase, tablasConDesp, clips, omegaPiezas, omegaMetros, adhesivoLabel, m:mod, modelKey:modelo, desperdicio:desp });
+      return;
+    }
+    w = parseFloat(ancho); h = parseFloat(alto);
     if (!w || !h || w<=0 || h<=0) { setError("Ingresá las dimensiones de la pared."); return; }
     const r = calcMateriales(w, h, modelo, desp);
     setResult(r);
@@ -448,17 +475,32 @@ function Calculadora() {
               </div>
             )}
           </div>
-          {/* Dimensiones */}
+          {/* Modo de cálculo */}
           <div>
-            <label style={{ fontSize:11, color:T.gray500, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:8 }}>Dimensiones de la pared</label>
-            <div style={{ marginBottom:10 }}>
-              <label style={{ fontSize:12, color:T.gray600, display:"block", marginBottom:4 }}>Ancho (metros)</label>
-              <input value={ancho} onChange={e=>setAncho(e.target.value)} placeholder="ej: 2.00" type="number" step="0.01" style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${T.gray200}`, background:T.gray50, color:T.black, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"'JetBrains Mono',monospace" }}/>
+            <label style={{ fontSize:11, color:T.gray500, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", display:"block", marginBottom:8 }}>Modo de cálculo</label>
+            <div style={{ display:"flex", gap:6, marginBottom:14 }}>
+              {[{id:"dim",l:"Por dimensiones (ancho × alto)"},{id:"m2",l:"Por m²"}].map(opt=>(
+                <button key={opt.id} onClick={()=>{setModo(opt.id);setResult(null);setError("");}} style={{ flex:1, padding:"9px 8px", borderRadius:8, border:`1.5px solid ${modo===opt.id?T.black:T.gray200}`, background:modo===opt.id?T.black:T.white, color:modo===opt.id?T.white:T.gray500, fontSize:12, cursor:"pointer", fontFamily:"inherit", transition:"all .15s", fontWeight:modo===opt.id?600:400 }}>{opt.l}</button>
+              ))}
             </div>
-            <div style={{ marginBottom:12 }}>
-              <label style={{ fontSize:12, color:T.gray600, display:"block", marginBottom:4 }}>Alto (metros)</label>
-              <input value={alto} onChange={e=>setAlto(e.target.value)} placeholder="ej: 3.00" type="number" step="0.01" style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${T.gray200}`, background:T.gray50, color:T.black, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"'JetBrains Mono',monospace" }}/>
-            </div>
+            {modo==="dim" ? (
+              <>
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ fontSize:12, color:T.gray600, display:"block", marginBottom:4 }}>Ancho (metros)</label>
+                  <input value={ancho} onChange={e=>setAncho(e.target.value)} placeholder="ej: 2.00" type="number" step="0.01" style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${T.gray200}`, background:T.gray50, color:T.black, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"'JetBrains Mono',monospace" }}/>
+                </div>
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:12, color:T.gray600, display:"block", marginBottom:4 }}>Alto (metros)</label>
+                  <input value={alto} onChange={e=>setAlto(e.target.value)} placeholder="ej: 3.00" type="number" step="0.01" style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${T.gray200}`, background:T.gray50, color:T.black, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"'JetBrains Mono',monospace" }}/>
+                </div>
+              </>
+            ) : (
+              <div style={{ marginBottom:12 }}>
+                <label style={{ fontSize:12, color:T.gray600, display:"block", marginBottom:4 }}>Superficie total (m²)</label>
+                <input value={m2} onChange={e=>setM2(e.target.value)} placeholder="ej: 25.50" type="number" step="0.01" style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${T.gray200}`, background:T.gray50, color:T.black, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"'JetBrains Mono',monospace" }}/>
+                <div style={{ marginTop:6, fontSize:11, color:T.gray400 }}>El cálculo por m² incluye el desperdicio — ideal para presupuestos rápidos.</div>
+              </div>
+            )}
             <div>
               <label style={{ fontSize:12, color:T.gray600, display:"block", marginBottom:4 }}>Desperdicio: <strong style={{color:T.black}}>{desp}%</strong></label>
               <input type="range" min={10} max={20} step={5} value={desp} onChange={e=>setDesp(+e.target.value)} style={{ width:"100%", accentColor:T.black }}/>
@@ -479,32 +521,34 @@ function Calculadora() {
 
       {result && (
         <div style={{ background:T.white, border:`1px solid ${T.gray200}`, borderRadius:14, overflow:"hidden" }}>
-          {/* Header */}
           <div style={{ padding:"14px 20px", background:T.black, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ fontSize:15, fontWeight:700, color:T.white }}>{result.modelKey}</span>
-            <span style={{ fontSize:12, color:T.gray400, fontFamily:"'JetBrains Mono',monospace" }}>{result.w}m × {result.h}m · +{result.desperdicio}%</span>
+            <span style={{ fontSize:12, color:T.gray400, fontFamily:"'JetBrains Mono',monospace" }}>
+              {result.modo==="m2" ? `${result.m2txt} m²` : `${result.w}m × ${result.h}m`} · +{result.desperdicio}%
+            </span>
           </div>
-          {/* Alerta unión */}
-          {result.unionAlerta
-            ? <div style={{ padding:"10px 20px", background:T.amberLight, borderBottom:`1px solid #FDE68A`, fontSize:12.5, color:T.amber }}>⚠️ El alto ({result.h}m) supera el largo de la tabla ({result.m.largo}m). Se necesitan {result.filasCompletas} tabla{result.filasCompletas>1?"s":""} completa{result.filasCompletas>1?"s":""} + {result.tablasExtra} tabla{result.tablasExtra>1?"s":""} extra para recortes de {result.sobrante}m. Habrá unión horizontal.</div>
-            : <div style={{ padding:"10px 20px", background:T.greenLight, borderBottom:`1px solid #BBF7D0`, fontSize:12.5, color:T.green }}>✓ La tabla ({result.m.largo}m) cubre el alto ({result.h}m). Se coloca entera y se recorta a medida — sin uniones.</div>
+          {result.modo==="m2"
+            ? <div style={{ padding:"10px 20px", background:T.greenLight, borderBottom:`1px solid #BBF7D0`, fontSize:12.5, color:T.green }}>✓ Cálculo por m² · {result.m2txt} m² · base: {result.tablasBase} tablas → con {result.desperdicio}% desperdicio: {result.tablasConDesp} tablas</div>
+            : result.unionAlerta
+              ? <div style={{ padding:"10px 20px", background:T.amberLight, borderBottom:`1px solid #FDE68A`, fontSize:12.5, color:T.amber }}>⚠️ El alto ({result.h}m) supera el largo de la tabla ({result.m.largo}m). Se necesitan {result.filasCompletas} tabla{result.filasCompletas>1?"s":""} completa{result.filasCompletas>1?"s":""} + {result.tablasExtra} tabla{result.tablasExtra>1?"s":""} extra para recortes de {result.sobrante}m. Habrá unión horizontal.</div>
+              : <div style={{ padding:"10px 20px", background:T.greenLight, borderBottom:`1px solid #BBF7D0`, fontSize:12.5, color:T.green }}>✓ La tabla ({result.m.largo}m) cubre el alto ({result.h}m). Se coloca entera y se recorta a medida — sin uniones.</div>
           }
-          {/* Desarrollo */}
-          <div style={{ padding:"14px 20px", background:T.gray50, borderBottom:`1px solid ${T.gray200}` }}>
-            <div style={{ fontSize:10, color:T.gray500, marginBottom:8, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em" }}>Desarrollo del cálculo</div>
-            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:T.gray600, lineHeight:2 }}>
-              <div>Columnas = ceil({result.w} ÷ {result.m.anchoUtil}) = <strong style={{color:T.black}}>ceil({(result.w/result.m.anchoUtil).toFixed(2)}) = {result.columnas}</strong></div>
-              {!result.unionAlerta
-                ? <div>Alto {result.h}m ≤ largo {result.m.largo}m → <strong style={{color:T.black}}>1 fila, tabla recortada</strong></div>
-                : <div>Completas: {result.columnas}×{result.filasCompletas} = {result.columnas*result.filasCompletas} + extras para {result.sobrante}m = <strong style={{color:T.black}}>+{result.tablasExtra}</strong></div>
-              }
-              <div>Base: <strong style={{color:T.black}}>{result.tablasBase} tablas</strong> → con {result.desperdicio}%: ceil({result.tablasBase}×{1+result.desperdicio/100}) = <strong style={{color:T.black,fontSize:14}}>{result.tablasConDesp} tablas</strong></div>
+          {result.modo!=="m2" && (
+            <div style={{ padding:"14px 20px", background:T.gray50, borderBottom:`1px solid ${T.gray200}` }}>
+              <div style={{ fontSize:10, color:T.gray500, marginBottom:8, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em" }}>Desarrollo del cálculo</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:T.gray600, lineHeight:2 }}>
+                <div>Columnas = ceil({result.w} ÷ {result.m.anchoUtil}) = <strong style={{color:T.black}}>ceil({(result.w/result.m.anchoUtil).toFixed(2)}) = {result.columnas}</strong></div>
+                {!result.unionAlerta
+                  ? <div>Alto {result.h}m ≤ largo {result.m.largo}m → <strong style={{color:T.black}}>1 fila, tabla recortada</strong></div>
+                  : <div>Completas: {result.columnas}×{result.filasCompletas} = {result.columnas*result.filasCompletas} + extras para {result.sobrante}m = <strong style={{color:T.black}}>+{result.tablasExtra}</strong></div>
+                }
+                <div>Base: <strong style={{color:T.black}}>{result.tablasBase} tablas</strong> → con {result.desperdicio}%: ceil({result.tablasBase}×{1+result.desperdicio/100}) = <strong style={{color:T.black,fontSize:14}}>{result.tablasConDesp} tablas</strong></div>
+              </div>
             </div>
-          </div>
-          {/* Cards resultado */}
+          )}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:1, background:T.gray200 }}>
             {[
-              { l:"Tablas necesarias",  v:`${result.tablasConDesp}`, n:`${result.columnas} col. × ${result.unionAlerta?result.filasCompletas:"1"} fila${result.tablasExtra>0?` +${result.tablasExtra} extras`:""}` },
+              { l:"Tablas necesarias", v:`${result.tablasConDesp}`, n:result.modo==="m2"?`${result.m2txt} m² · +${result.desperdicio}% desp.`:`${result.columnas||"—"} col. × ${result.unionAlerta?result.filasCompletas:"1"} fila${result.tablasExtra>0?` +${result.tablasExtra} extras`:""}` },
               ...(result.clips>0 ? [{ l:`Clips ${result.m.clip}`, v:`${result.clips}`, n:`8 clips × ${result.tablasConDesp} piezas` }] : []),
               ...(result.omegaPiezas>0 ? [{ l:"Perfiles omega", v:`${result.omegaPiezas} pzas`, n:`${result.omegaMetros}m lin. · c/40cm · piezas 2.50m` }] : []),
               ...(result.adhesivoLabel ? [{ l:"Adhesivo", v:result.adhesivoLabel, n:"KPU 40 / Fischer / Unipega" }] : []),
@@ -516,7 +560,6 @@ function Calculadora() {
               </div>
             ))}
           </div>
-          {/* Sistema */}
           <div style={{ padding:"12px 20px", background:T.gray50, fontSize:12, color:T.gray600, lineHeight:1.7 }}>
             <strong style={{color:T.black}}>Sistema: </strong>{sistemaLabel[result.m.linea==="elite"||result.m.linea==="premium"?(result.m.clipsXpieza>0?"omega+clips":"omega+atornillado"):"pegado"]}
           </div>
@@ -728,8 +771,8 @@ function AlertsView({ alerts, setAlerts, setKb }) {
 
 // ─── SIDEBAR ──────────────────────────────
 function Sidebar({ role, tab, setTab, onLogout, alertCount }) {
-  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"precios",icon:<IPrice/>,l:"Precios"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount}];
-  const vendedorItems = [{id:"chat",icon:<IChat/>,l:"Consultas IA"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"precios",icon:<IPrice/>,l:"Lista de Precios"}];
+  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount}];
+  const vendedorItems = [{id:"chat",icon:<IChat/>,l:"Consultas IA"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"}];
   const items = role==="admin" ? adminItems : vendedorItems;
   return(
     <div style={{width:210,background:T.black,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0}}>
@@ -761,7 +804,7 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount }) {
 function Panel({ role, onLogout, kb, setKb }) {
   const [tab,setTab]=useState("chat");
   const [alerts,setAlerts]=useState([]);
-  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",precios:"Lista de Precios",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento"};
+  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento"};
   const desde = role==="admin"?"Administrador":"Vendedor";
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:"Outfit,sans-serif",background:T.gray50}}>
@@ -775,7 +818,6 @@ function Panel({ role, onLogout, kb, setKb }) {
           {tab==="chat"    && <ChatCore kb={kb} setKb={setKb} setAlerts={setAlerts} isAdmin={role==="admin"} desde={desde}/>}
           {tab==="calc"    && <div style={{height:"100%",overflowY:"auto"}}><Calculadora/></div>}
           {tab==="catalog" && <CatalogoView/>}
-          {tab==="precios" && <PreciosView/>}
           {tab==="kb"      && <KBView kb={kb} setKb={setKb}/>}
           {tab==="train"   && <div style={{display:"flex",height:"100%"}}><TrainView kb={kb} setKb={setKb}/></div>}
           {tab==="alerts"  && <AlertsView alerts={alerts} setAlerts={setAlerts} setKb={setKb}/>}
