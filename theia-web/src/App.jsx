@@ -10,18 +10,17 @@ const T = {
 };
 
 const USERS = {
-  admin:    { pass:"theia2026",  role:"admin",    label:"Administrador", email:"theiadesignandco@gmail.com" },
-  vendedor: { pass:"vende2026",  role:"vendedor", label:"Vendedor",       email:"theiaventas@gmail.com" },
-  theia:    { pass:"cliente123", role:"client",   label:"Cliente",        email:"—" },
+  sociostheia: { pass:"theiadesing25",  role:"admin",    label:"Administrador" },
+  theiaventas: { pass:"libertador6501", role:"vendedor", label:"Vendedor"      },
 };
 const OWNER_WA = "541134423383";
 const SHEET_ID = "1N4p7U1umPDv3umT38f6zTyKQSjO7vmIIwPdmVe6xt1Y";
 
 // ─── PDF LINKS ────────────────────────────
 const PDF_LINKS = [
-  { label:"Catálogo Theia 2026",        url:"https://drive.google.com/file/d/THEIA_catalogo_2026/view",     icon:"🏛️" },
-  { label:"Catálogo WPC Elite",         url:"https://drive.google.com/file/d/CATALOGO_WPC_ELITE/view",      icon:"🪵" },
-  { label:"Catálogo WPC Premium",       url:"https://drive.google.com/file/d/CATALOGO_WPC_PREMIUM/view",    icon:"🏠" },
+  { label:"Catálogo Theia 2026",  url:"https://drive.google.com/file/d/1xaDJ2OL1bxE18gcc5zArvHpy5BmmMxHS/view?usp=sharing", icon:"🏛️" },
+  { label:"Catálogo WPC Elite",   url:"https://drive.google.com/file/d/1lrvGVdOmmRn6xRLigcE1F8cXacBG9HZw/view?usp=sharing", icon:"🪵" },
+  { label:"Catálogo WPC Premium", url:"https://drive.google.com/file/d/12S9406INtIvdHryzkQN8zDfZBArvHXDv/view?usp=sharing", icon:"🏠" },
 ];
 
 // ─── MODELOS (todos los anchos y specs corregidos) ─
@@ -202,12 +201,14 @@ const TRAIN_SYS = `Sos un consultor ayudando a cargar la base de conocimiento de
 
 // ─── UTILS ────────────────────────────────
 const nowT = () => new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+const AK = import.meta.env.VITE_ANTHROPIC_KEY||"";
+const AH = {"Content-Type":"application/json","x-api-key":AK,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"};
 const claudeCall = async (system, messages, max=1000) => {
-  const r = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:max,system,messages})});
+  const r = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:AH,body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:max,system,messages})});
   return (await r.json()).content?.[0]?.text||"";
 };
 const claudePDF = async (b64, name) => {
-  const r = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:`Extraé toda la información del catálogo de Theia: productos, precios, colores, specs, garantías. Formato estructurado. Archivo: ${name}`}]}]})});
+  const r = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:AH,body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:`Extraé toda la información del catálogo de Theia: productos, precios, colores, specs, garantías. Formato estructurado. Archivo: ${name}`}]}]})});
   return (await r.json()).content?.[0]?.text||"";
 };
 const sendWhatsApp = (question, reason, desde) => {
@@ -616,12 +617,11 @@ function PreciosView() {
 // ─── LOGIN ────────────────────────────────
 function Login({ onLogin }) {
   const [u,setU]=useState(""); const [p,setP]=useState(""); const [sp,setSp]=useState(false); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
-  const go = async (overrideU, overrideP) => {
-    const userName = overrideU || u; const pass = overrideP || p;
-    if (!userName || !pass) return;
+  const go = async () => {
+    if (!u || !p) return;
     setErr(""); setLoading(true); await new Promise(r=>setTimeout(r,500));
-    const usr = USERS[userName.trim().toLowerCase()];
-    if (usr && usr.pass===pass) { onLogin(userName.trim().toLowerCase(), usr.role, usr.label); }
+    const usr = USERS[u.trim().toLowerCase()];
+    if (usr && usr.pass===p) { onLogin(u.trim().toLowerCase(), usr.role, usr.label); }
     else setErr("Usuario o contraseña incorrectos");
     setLoading(false);
   };
@@ -651,37 +651,6 @@ function Login({ onLogin }) {
           <button onClick={()=>go()} disabled={loading||!u||!p} style={{ width:"100%", padding:"13px", background:loading||!u||!p?T.gray700:T.white, border:"none", borderRadius:8, color:loading||!u||!p?T.gray500:T.black, fontSize:14, fontWeight:700, cursor:loading||!u||!p?"not-allowed":"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .2s" }}>
             {loading ? <><div style={{ width:16,height:16,border:"2px solid rgba(0,0,0,0.2)",borderTopColor:T.black,borderRadius:"50%",animation:"spin 1s linear infinite" }}></div>Ingresando...</> : "Ingresar"}
           </button>
-          {/* Divider */}
-          <div style={{ display:"flex", alignItems:"center", gap:12, margin:"18px 0" }}>
-            <div style={{ flex:1, height:1, background:T.gray800 }}></div>
-            <span style={{ fontSize:11, color:T.gray700 }}>o accedé con tu cuenta</span>
-            <div style={{ flex:1, height:1, background:T.gray800 }}></div>
-          </div>
-          {/* Google buttons por rol */}
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {[
-              { key:"admin",   label:"Administrador",  email:"theiadesignandco@gmail.com", badge:"Admin" },
-              { key:"vendedor",label:"Vendedor",         email:"theiaventas@gmail.com",       badge:"Ventas" },
-            ].map(opt=>(
-              <button key={opt.key} onClick={()=>{ setU(opt.key); setP(USERS[opt.key].pass); setTimeout(()=>go(opt.key, USERS[opt.key].pass), 100); }} style={{ width:"100%", padding:"11px 14px", background:T.gray800, border:`1px solid ${T.gray700}`, borderRadius:8, color:T.white, fontSize:13, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:10, transition:"all .2s", textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background=T.gray700} onMouseLeave={e=>e.currentTarget.style.background=T.gray800}>
-                <svg width={16} height={16} viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:12.5, fontWeight:600, color:T.white }}>{opt.label}</div>
-                  <div style={{ fontSize:11, color:T.gray500, marginTop:1 }}>{opt.email}</div>
-                </div>
-                <span style={{ fontSize:10, background:T.gray700, color:T.gray400, padding:"2px 8px", borderRadius:4, fontWeight:600 }}>{opt.badge}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* Hint cuentas */}
-        <div style={{ marginTop:14, display:"flex", gap:8 }}>
-          {Object.entries(USERS).map(([key,val])=>(
-            <button key={key} onClick={()=>{ setU(key); setP(val.pass); setErr(""); }} style={{ flex:1, padding:"9px 8px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:8, color:T.gray700, fontSize:10.5, cursor:"pointer", fontFamily:"inherit", textAlign:"center" }} onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.15)";e.currentTarget.style.color=T.gray400;}} onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.07)";e.currentTarget.style.color=T.gray700;}}>
-              <div style={{ fontWeight:600, marginBottom:1 }}>{val.label}</div>
-              <div style={{ color:"#333" }}>{key} / {val.pass}</div>
-            </button>
-          ))}
         </div>
       </div>
     </div>
