@@ -291,6 +291,8 @@ const IKB      = ()       => <Ic d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0
 const IZap     = ()       => <Ic d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>;
 const IPDF     = ()       => <Ic d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M9 13h6M9 17h4"/>;
 const IWA = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="#16A34A"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
+const ICRM     = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>;
+const IMetrics = ()       => <Ic d="M18 20V10M12 20V4M6 20v-6"/>;
 
 // ─── BUBBLE ───────────────────────────────
 function Bubble({ msg, isAdmin, onCorrect }) {
@@ -769,9 +771,422 @@ function AlertsView({ alerts, setAlerts, setKb }) {
   );
 }
 
+// ─── CRM UTILS ────────────────────────────
+const CRM_KEY = "theia_crm_v1";
+const MET_KEY = "theia_met_v1";
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const todayStr = () => new Date().toISOString().slice(0,10);
+const daysSince = (d) => d ? Math.floor((Date.now()-new Date(d))/86400000) : null;
+const fmtDate = (s) => { if(!s)return"—"; const d=new Date(s+"T00:00:00"); return d.toLocaleDateString("es-AR",{day:"2-digit",month:"short"}); };
+const ESTADO_LABELS = {lead_frio:"Lead frío",lead_tibio:"Lead tibio",lead_caliente:"Lead caliente",presupuesto_enviado:"Presupuesto enviado",negociacion:"Negociación",cerrado:"Cerrado",perdido:"Perdido"};
+const FUENTE_LABELS = {meta:"Meta Ads",instagram:"Instagram",referido:"Referido",arquitecto:"Arquitecto",desarrolladora:"Desarrolladora",organico:"Orgánico",showroom:"Showroom",otro:"Otro"};
+const ESTADO_COLORS = {lead_frio:"#5c9be0",lead_tibio:"#e09b3d",lead_caliente:"#e05c5c",presupuesto_enviado:"#9b5ce0",negociacion:"#c9a96e",cerrado:"#4caf7d",perdido:"#555"};
+const reminderLv = (c) => {
+  if(c.estado==="cerrado"||c.estado==="perdido") return "done";
+  const d = daysSince(c.fechaContacto);
+  if(d===null) return "warning";
+  if(d>=7) return "urgente";
+  if(d>=5) return "warning";
+  return "ok";
+};
+const lsGet = (k,def) => { try{ const v=localStorage.getItem(k); return v!=null?JSON.parse(v):def; }catch{ return def; } };
+const lsSet = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+
+// ─── CRM VIEW ─────────────────────────────
+function CRMView() {
+  const [clients, setClients]       = useState(() => lsGet(CRM_KEY,[]));
+  const [modal, setModal]           = useState(null); // null | "new" | "edit" | "log"
+  const [editId, setEditId]         = useState(null);
+  const [logId, setLogId]           = useState(null);
+  const [pipeFilter, setPipeFilter] = useState("");
+  const [search, setSearch]         = useState("");
+  const [filterFuente, setFilterFuente] = useState("");
+  const [filterUrgency, setFilterUrgency] = useState("");
+  const [form, setForm] = useState({nombre:"",telefono:"",estado:"lead_frio",fuente:"meta",producto:"",presupuesto:"",fechaContacto:todayStr(),ultimaAccion:"",proximaAccion:"",notas:""});
+  const [logText, setLogText]       = useState("");
+  const [logEstado, setLogEstado]   = useState("");
+  const [logProxima, setLogProxima] = useState("");
+
+  const save = (arr) => { setClients(arr); lsSet(CRM_KEY,arr); };
+
+  const openNew = () => {
+    setEditId(null);
+    setForm({nombre:"",telefono:"",estado:"lead_frio",fuente:"meta",producto:"",presupuesto:"",fechaContacto:todayStr(),ultimaAccion:"",proximaAccion:"",notas:""});
+    setModal("new");
+  };
+  const openEdit = (id) => {
+    const c = clients.find(x=>x.id===id);
+    if(!c) return;
+    setEditId(id); setForm({...c}); setModal("edit");
+  };
+  const openLog = (id) => {
+    const c = clients.find(x=>x.id===id);
+    setLogId(id); setLogText(""); setLogEstado(""); setLogProxima(c?.proximaAccion||""); setModal("log");
+  };
+  const saveClient = () => {
+    if(!form.nombre.trim()) return;
+    if(editId) {
+      save(clients.map(c=>c.id===editId?{...c,...form}:c));
+    } else {
+      save([{id:uid(),...form,createdAt:todayStr(),log:[]},...clients]);
+    }
+    setModal(null);
+  };
+  const deleteClient = (id) => { if(window.confirm("¿Eliminar este cliente?")) save(clients.filter(c=>c.id!==id)); };
+  const saveLog = () => {
+    if(!logText.trim()) return;
+    const now = new Date();
+    const entry = {texto:logText,fecha:now.toLocaleDateString("es-AR"),hora:now.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}),estadoNuevo:logEstado||null};
+    save(clients.map(c=>{
+      if(c.id!==logId) return c;
+      return {...c,log:[...(c.log||[]),entry],ultimaAccion:logText,fechaContacto:todayStr(),...(logEstado?{estado:logEstado}:{}),proximaAccion:logProxima||c.proximaAccion};
+    }));
+    setModal(null);
+  };
+
+  // Filtered & sorted clients
+  let filtered = clients.filter(c=>{
+    if(search && !(`${c.nombre} ${c.telefono} ${c.producto}`).toLowerCase().includes(search.toLowerCase())) return false;
+    if(filterFuente && c.fuente!==filterFuente) return false;
+    if(pipeFilter && c.estado!==pipeFilter) return false;
+    if(filterUrgency && reminderLv(c)!==filterUrgency) return false;
+    return true;
+  }).sort((a,b)=>{const o={urgente:0,warning:1,ok:2,done:3};return (o[reminderLv(a)]??3)-(o[reminderLv(b)]??3);});
+
+  const urgCount  = clients.filter(c=>reminderLv(c)==="urgente").length;
+  const warnCount = clients.filter(c=>reminderLv(c)==="warning").length;
+  const active    = clients.filter(c=>c.estado!=="cerrado"&&c.estado!=="perdido");
+  const cerrados  = clients.filter(c=>c.estado==="cerrado");
+
+  const C = T; // color alias
+  const dark = "#0e0e0e"; const dsurf="#161616"; const dsurf2="#1e1e1e"; const dborder="#2a2a2a"; const dborder2="#333";
+  const dtext="#e8e8e8"; const dtext2="#999"; const dtext3="#555";
+
+  const inp = {width:"100%",background:dsurf2,border:`1px solid ${dborder}`,borderRadius:7,padding:"8px 11px",color:dtext,fontFamily:"inherit",fontSize:13,outline:"none"};
+  const selInp = {...inp,appearance:"none"};
+
+  return (
+    <div style={{background:dark,minHeight:"100%",padding:24,color:dtext,overflowY:"auto",height:"100%"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:30,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase",lineHeight:1}}>CRM</div>
+          <div style={{fontSize:12,color:dtext3,marginTop:4}}>Seguimiento de clientes y leads — Theia Design & Co</div>
+        </div>
+        <button onClick={openNew} style={{background:dtext,color:dark,border:"none",borderRadius:8,padding:"8px 18px",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nuevo cliente</button>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:18}}>
+        {[
+          {label:"Total clientes",value:clients.length,sub:`${active.length} activos`,col:dtext},
+          {label:"⚠ Urgentes",value:urgCount,sub:"7+ días sin contacto",col:"#e05c5c"},
+          {label:"◌ Pendientes",value:warnCount,sub:"5–6 días sin contacto",col:"#e09b3d"},
+          {label:"✓ Cerrados",value:cerrados.length,sub:`de ${active.length+cerrados.length}`,col:"#4caf7d"},
+        ].map(s=>(
+          <div key={s.label} style={{background:dsurf,border:`1px solid ${dborder}`,borderRadius:10,padding:"13px 15px"}}>
+            <div style={{fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{s.label}</div>
+            <div style={{fontSize:24,fontWeight:800,color:s.col,lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:11,color:dtext2,marginTop:3}}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pipeline pills */}
+      <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:16,paddingBottom:2}}>
+        {[{e:"",l:"Todos"},...Object.entries(ESTADO_LABELS).map(([e,l])=>({e,l}))].map(({e,l})=>{
+          const n = e ? clients.filter(c=>c.estado===e).length : clients.length;
+          const active2 = pipeFilter===e;
+          return(
+            <div key={e} onClick={()=>{setPipeFilter(e);}} style={{flexShrink:0,padding:"5px 12px",borderRadius:20,border:`1px solid ${active2?"#c9a96e":dborder}`,background:dsurf,fontSize:12,cursor:"pointer",color:active2?"#c9a96e":dtext2,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+              {l} <span style={{background:dsurf2,color:active2?"#c9a96e":dtext2,borderRadius:10,padding:"1px 6px",fontSize:10}}>{n}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filters */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar..." style={{...inp,minWidth:180,maxWidth:240}}/>
+        <div style={{position:"relative"}}>
+          <select value={filterFuente} onChange={e=>setFilterFuente(e.target.value)} style={selInp}>
+            <option value="">Todas las fuentes</option>
+            {Object.entries(FUENTE_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span>
+        </div>
+        <div style={{position:"relative"}}>
+          <select value={filterUrgency} onChange={e=>setFilterUrgency(e.target.value)} style={selInp}>
+            <option value="">Todos</option>
+            <option value="urgente">Urgentes (7+ días)</option>
+            <option value="warning">Pendientes (5+ días)</option>
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span>
+        </div>
+        {(search||filterFuente||pipeFilter||filterUrgency)&&<button onClick={()=>{setSearch("");setFilterFuente("");setPipeFilter("");setFilterUrgency("");}} style={{background:"none",border:`1px solid ${dborder2}`,borderRadius:7,color:dtext2,fontSize:12,cursor:"pointer",padding:"5px 10px",fontFamily:"inherit"}}>Limpiar</button>}
+      </div>
+
+      {/* Client cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
+        {filtered.length===0 && <div style={{gridColumn:"1/-1",textAlign:"center",padding:"50px 20px",color:dtext3}}>👥 No hay clientes con estos filtros</div>}
+        {filtered.map(c=>{
+          const lv=reminderLv(c); const d=daysSince(c.fechaContacto);
+          const ecol=ESTADO_COLORS[c.estado]||dborder2;
+          const urgBorder = lv==="urgente"?"#e05c5c":lv==="warning"?"#e09b3d":dborder;
+          return(
+            <div key={c.id} style={{background:dsurf,border:`1px solid ${urgBorder}`,borderRadius:10,padding:14,position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:ecol,borderRadius:"10px 0 0 10px"}}/>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14,color:dtext}}>{c.nombre}</div>
+                  {c.telefono&&<a href={`https://wa.me/${c.telefono.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{fontSize:11,color:dtext2,textDecoration:"none"}}>📱 {c.telefono}</a>}
+                </div>
+                <div style={{display:"flex",gap:3,flexShrink:0}}>
+                  {[["📝",()=>openLog(c.id)],["✏️",()=>openEdit(c.id)],["✕",()=>deleteClient(c.id)]].map(([icon,fn],i)=>(
+                    <button key={i} onClick={fn} style={{background:"none",border:`1px solid ${dborder}`,color:dtext2,borderRadius:5,padding:"3px 5px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=dtext2} onMouseLeave={e=>e.currentTarget.style.borderColor=dborder}>{icon}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+                <span style={{background:dsurf2,color:ecol,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em"}}>{ESTADO_LABELS[c.estado]||c.estado}</span>
+                <span style={{background:dsurf2,color:dtext2,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:600}}>{FUENTE_LABELS[c.fuente]||c.fuente||"—"}</span>
+              </div>
+              {c.producto&&<div style={{fontSize:11,color:dtext2,marginBottom:3}}><strong style={{color:dtext}}>Producto:</strong> {c.producto}</div>}
+              {c.presupuesto&&<div style={{fontSize:11,color:dtext2,marginBottom:3}}><strong style={{color:dtext}}>Presupuesto:</strong> ${Number(c.presupuesto).toLocaleString("es-AR")}</div>}
+              {lv==="urgente"&&<div style={{background:"#e05c5c20",color:"#e05c5c",border:"1px solid #e05c5c30",borderRadius:5,padding:"3px 8px",fontSize:10,fontWeight:700,display:"inline-block",marginTop:6}}>🔴 {d} días sin contacto — URGENTE</div>}
+              {lv==="warning"&&<div style={{background:"#e09b3d20",color:"#e09b3d",border:"1px solid #e09b3d30",borderRadius:5,padding:"3px 8px",fontSize:10,fontWeight:700,display:"inline-block",marginTop:6}}>🟡 {d} días sin contacto</div>}
+              {lv==="ok"&&d!==null&&<div style={{background:"#4caf7d20",color:"#4caf7d",border:"1px solid #4caf7d30",borderRadius:5,padding:"3px 8px",fontSize:10,fontWeight:700,display:"inline-block",marginTop:6}}>✓ Hace {d} día{d===1?"":"s"}</div>}
+              {c.ultimaAccion&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${dborder}`}}><div style={{fontSize:9,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Última acción</div><div style={{fontSize:11,color:dtext2}}>{c.ultimaAccion}</div></div>}
+              {c.proximaAccion&&<div style={{marginTop:6}}><div style={{fontSize:9,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Próxima acción</div><div style={{fontSize:11,color:"#c9a96e"}}>{c.proximaAccion}</div></div>}
+              {c.notas&&<div style={{marginTop:6,paddingTop:6,borderTop:`1px solid ${dborder}`}}><div style={{fontSize:11,color:dtext2,fontStyle:"italic"}}>{c.notas}</div></div>}
+              <div style={{fontSize:9,color:dtext3,marginTop:8,textAlign:"right"}}>Contacto: {fmtDate(c.fechaContacto)} · Alta: {fmtDate(c.createdAt)}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── CLIENT MODAL ── */}
+      {(modal==="new"||modal==="edit")&&(
+        <div onClick={e=>{if(e.target===e.currentTarget)setModal(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:dsurf,border:`1px solid ${dborder2}`,borderRadius:14,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:26}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <div style={{fontSize:18,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",color:dtext}}>{editId?"Editar Cliente":"Nuevo Cliente"}</div>
+              <button onClick={()=>setModal(null)} style={{background:"none",border:`1px solid ${dborder}`,color:dtext2,borderRadius:6,width:30,height:30,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>✕</button>
+            </div>
+            {[
+              [{label:"Nombre *",key:"nombre",placeholder:"Nombre completo"},{label:"Teléfono / WhatsApp",key:"telefono",placeholder:"+54 11 xxxxxxxx"}],
+              [{label:"Estado",key:"estado",type:"select",opts:Object.entries(ESTADO_LABELS).map(([v,l])=>({v,l}))},{label:"Fuente",key:"fuente",type:"select",opts:Object.entries(FUENTE_LABELS).map(([v,l])=>({v,l}))}],
+            ].map((row,ri)=>(
+              <div key={ri} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                {row.map(f=>(
+                  <div key={f.key}>
+                    <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{f.label}</label>
+                    {f.type==="select"?(
+                      <div style={{position:"relative"}}><select value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} style={selInp}>{f.opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span></div>
+                    ):(
+                      <input value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder||""} style={inp}/>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {[
+              {label:"Producto de interés",key:"producto",placeholder:"WPC exterior, revestimiento interior, cerámicos..."},
+            ].map(f=>(
+              <div key={f.key} style={{marginBottom:12}}>
+                <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{f.label}</label>
+                <input value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={inp}/>
+              </div>
+            ))}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+              <div><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Presupuesto aprox. ($)</label><input type="number" value={form.presupuesto} onChange={e=>setForm(p=>({...p,presupuesto:e.target.value}))} placeholder="0" style={inp}/></div>
+              <div><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Último contacto</label><input type="date" value={form.fechaContacto} onChange={e=>setForm(p=>({...p,fechaContacto:e.target.value}))} style={inp}/></div>
+            </div>
+            {[{label:"Última acción",key:"ultimaAccion",placeholder:"Ej: Envié catálogo WPC"},{label:"Próxima acción",key:"proximaAccion",placeholder:"Ej: Llamar para confirmar visita"},{label:"Notas",key:"notas",placeholder:"Contexto, detalles del proyecto...",textarea:true}].map(f=>(
+              <div key={f.key} style={{marginBottom:12}}>
+                <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{f.label}</label>
+                {f.textarea?<textarea value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{...inp,minHeight:60,resize:"vertical"}}/>:<input value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={inp}/>}
+              </div>
+            ))}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16,paddingTop:14,borderTop:`1px solid ${dborder}`}}>
+              <button onClick={()=>setModal(null)} style={{background:"none",border:`1px solid ${dborder2}`,color:dtext2,borderRadius:7,padding:"7px 16px",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>Cancelar</button>
+              <button onClick={saveClient} style={{background:dtext,color:dark,border:"none",borderRadius:7,padding:"7px 18px",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>Guardar cliente</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── LOG ACTION MODAL ── */}
+      {modal==="log"&&(()=>{const c=clients.find(x=>x.id===logId); const logs=c?.log||[];return(
+        <div onClick={e=>{if(e.target===e.currentTarget)setModal(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:dsurf,border:`1px solid ${dborder2}`,borderRadius:14,width:"100%",maxWidth:440,maxHeight:"90vh",overflowY:"auto",padding:24}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div style={{fontSize:16,fontWeight:800,textTransform:"uppercase",color:dtext}}>Registrar Acción</div>
+              <button onClick={()=>setModal(null)} style={{background:"none",border:`1px solid ${dborder}`,color:dtext2,borderRadius:6,width:28,height:28,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+            </div>
+            {logs.length>0&&<div style={{maxHeight:180,overflowY:"auto",marginBottom:12,display:"flex",flexDirection:"column",gap:6}}>
+              {[...logs].reverse().map((l,i)=><div key={i} style={{background:dsurf2,borderRadius:7,padding:"8px 11px",borderLeft:`3px solid ${dborder2}`}}><div style={{fontSize:10,color:dtext3,marginBottom:2}}>{l.fecha} {l.hora}</div><div style={{fontSize:12,color:dtext}}>{l.texto}</div></div>)}
+            </div>}
+            <div style={{marginBottom:10}}><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Nueva acción realizada</label><textarea value={logText} onChange={e=>setLogText(e.target.value)} placeholder="Describí qué hiciste..." style={{...inp,minHeight:70,resize:"vertical"}}/></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Nuevo estado</label><div style={{position:"relative"}}><select value={logEstado} onChange={e=>setLogEstado(e.target.value)} style={selInp}><option value="">Sin cambio</option>{Object.entries(ESTADO_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span></div></div>
+              <div><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Próxima acción</label><input value={logProxima} onChange={e=>setLogProxima(e.target.value)} placeholder="Ej: Seguimiento en 3 días" style={inp}/></div>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setModal(null)} style={{background:"none",border:`1px solid ${dborder2}`,color:dtext2,borderRadius:7,padding:"6px 14px",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>Cancelar</button>
+              <button onClick={saveLog} style={{background:dtext,color:dark,border:"none",borderRadius:7,padding:"6px 16px",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>Registrar</button>
+            </div>
+          </div>
+        </div>
+      );})()}
+    </div>
+  );
+}
+
+// ─── MÉTRICAS VIEW ────────────────────────
+function MetricasView() {
+  const [data, setData] = useState(() => lsGet(MET_KEY,[]));
+  const [form, setForm] = useState({periodo:"",msgs:"",pres:"",cierre:"",monto:"",notas:""});
+  const chartRef = useRef(null);
+
+  const saveData = (arr) => { setData(arr); lsSet(MET_KEY,arr); };
+  const saveMetric = () => {
+    if(!form.periodo.trim()||(!form.msgs&&!form.pres&&!form.cierre)) return;
+    saveData([...data,{id:uid(),periodo:form.periodo,msgs:+form.msgs||0,pres:+form.pres||0,cierre:+form.cierre||0,monto:+form.monto||0,notas:form.notas,fecha:new Date().toISOString()}]);
+    setForm({periodo:"",msgs:"",pres:"",cierre:"",monto:"",notas:""});
+  };
+  const deleteMetric = (id) => saveData(data.filter(m=>m.id!==id));
+
+  const last = data.length ? data[data.length-1] : null;
+  const r1 = last&&last.msgs>0 ? ((last.pres/last.msgs)*100).toFixed(0) : null;
+  const r2 = last&&last.pres>0 ? ((last.cierre/last.pres)*100).toFixed(0) : null;
+  const r3 = last&&last.msgs>0 ? ((last.cierre/last.msgs)*100).toFixed(0) : null;
+  const rCol = (v,g,m) => v>=g?"#4caf7d":v>=m?"#e09b3d":"#e05c5c";
+
+  const diag = [];
+  if(r1!==null){ if(+r1<10)diag.push({lv:"bad",icon:"📵",t:"Problema en la calificación",d:`Solo ${r1}% de mensajes llega a presupuesto. Revisá el target de Meta y el guion inicial.`}); else if(+r1<25)diag.push({lv:"warning",icon:"📊",t:"Conversión a presupuesto mejorable",d:`${r1}% de mensajes genera presupuesto.`}); else diag.push({lv:"good",icon:"✅",t:"Buena calificación de leads",d:`${r1}% de mensajes genera presupuesto.`});}
+  if(r2!==null){ if(+r2<10)diag.push({lv:"bad",icon:"💸",t:"Problema en el cierre",d:`Solo ${r2}% de presupuestos se cierra. Revisá el seguimiento post-presupuesto.`}); else if(+r2<20)diag.push({lv:"warning",icon:"🔄",t:"Cierre mejorable",d:`${r2}% de presupuestos cerrados.`}); else diag.push({lv:"good",icon:"🏆",t:"Buen ratio de cierre",d:`${r2}% de presupuestos cerrados.`});}
+  if(last&&last.msgs<5) diag.push({lv:"warning",icon:"📢",t:"Bajo volumen de mensajes",d:"Menos de 5 mensajes en la semana. Revisá campañas de Meta."});
+  if(!diag.length) diag.push({lv:"good",icon:"👌",t:"Embudo saludable",d:"Las métricas se ven bien."});
+
+  const dark="#0e0e0e",dsurf="#161616",dsurf2="#1e1e1e",dborder="#2a2a2a",dborder2="#333",dtext="#e8e8e8",dtext2="#999",dtext3="#555";
+  const inp = {width:"100%",background:dsurf2,border:`1px solid ${dborder}`,borderRadius:7,padding:"8px 11px",color:dtext,fontFamily:"inherit",fontSize:13,outline:"none"};
+
+  useEffect(()=>{
+    const canvas=chartRef.current; if(!canvas||data.length<2)return;
+    const ctx=canvas.getContext("2d");
+    const W=canvas.parentElement.offsetWidth||600,H=160;
+    canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
+    const last8=data.slice(-8);const maxV=Math.max(...last8.map(m=>Math.max(m.msgs,m.pres,m.cierre,1)));
+    const pad={t:16,r:16,b:34,l:32};const cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;const step=cW/(last8.length-1);
+    ctx.strokeStyle="#2a2a2a";ctx.lineWidth=1;
+    [0,.5,1].forEach(t=>{const y=pad.t+cH-t*cH;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillStyle="#555";ctx.font="10px Outfit";ctx.textAlign="right";ctx.fillText(Math.round(t*maxV),pad.l-4,y+3);});
+    [[last8.map(m=>m.msgs),"#5c9be0"],[last8.map(m=>m.pres),"#9b5ce0"],[last8.map(m=>m.cierre),"#4caf7d"]].forEach(([pts,color])=>{
+      ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin="round";
+      pts.forEach((v,i)=>{const x=pad.l+i*step,y=pad.t+cH-(v/maxV)*cH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.stroke();
+      pts.forEach((v,i)=>{const x=pad.l+i*step,y=pad.t+cH-(v/maxV)*cH;ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();});
+    });
+    ctx.fillStyle="#555";ctx.font="10px Outfit";ctx.textAlign="center";
+    last8.forEach((m,i)=>ctx.fillText(m.periodo.slice(0,8),pad.l+i*step,H-8));
+    let lx=pad.l;[["#5c9be0","Msgs"],["#9b5ce0","Pres."],["#4caf7d","Cierres"]].forEach(([c,l])=>{ctx.fillStyle=c;ctx.fillRect(lx,4,10,3);ctx.fillStyle="#888";ctx.textAlign="left";ctx.fillText(l,lx+14,10);lx+=70;});
+  },[data]);
+
+  const pct = (v) => last ? Math.max(5,Math.round((v/Math.max(last.msgs,1))*100)) : 5;
+
+  return(
+    <div style={{background:dark,minHeight:"100%",overflowY:"auto",height:"100%",padding:24,color:dtext}}>
+      <div style={{marginBottom:20}}><div style={{fontSize:30,fontWeight:800,letterSpacing:"0.12em",textTransform:"uppercase"}}>MÉTRICAS</div><div style={{fontSize:12,color:dtext3,marginTop:4}}>Rendimiento comercial y diagnóstico de embudo</div></div>
+      <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:18,alignItems:"start"}}>
+        {/* Form */}
+        <div style={{background:dsurf,border:`1px solid ${dborder}`,borderRadius:12,padding:20,position:"sticky",top:10}}>
+          <div style={{fontSize:16,fontWeight:800,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:14}}>Registrar semana</div>
+          {[{label:"Período / Semana",key:"periodo",placeholder:"Ej: Sem 14 — Abr 2025"},{label:"📱 Mensajes WhatsApp",key:"msgs",placeholder:"0",type:"number"},{label:"📋 Presupuestos realizados",key:"pres",placeholder:"0",type:"number"},{label:"✅ Presupuestos cerrados",key:"cierre",placeholder:"0",type:"number"},{label:"💰 Monto total cerrado ($)",key:"monto",placeholder:"0",type:"number"}].map(f=>(
+            <div key={f.key} style={{marginBottom:10}}>
+              <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{f.label}</label>
+              <input type={f.type||"text"} value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={inp}/>
+            </div>
+          ))}
+          <div style={{marginBottom:12}}>
+            <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Notas</label>
+            <textarea value={form.notas} onChange={e=>setForm(p=>({...p,notas:e.target.value}))} placeholder="Campañas, observaciones..." style={{...inp,minHeight:50,resize:"vertical"}}/>
+          </div>
+          <button onClick={saveMetric} style={{width:"100%",background:dtext,color:dark,border:"none",borderRadius:7,padding:"9px",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>Guardar registro</button>
+        </div>
+
+        {/* Right: charts & table */}
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Funnel */}
+          <div style={{background:dsurf,border:`1px solid ${dborder}`,borderRadius:12,padding:20}}>
+            <div style={{fontSize:16,fontWeight:800,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:14}}>Embudo — Última semana</div>
+            {!last?<div style={{color:dtext3,fontSize:13}}>Registrá una semana para ver el embudo</div>:(
+              <>
+                {[[last.msgs,"Mensajes WA","#5c9be0","#7bb3f0","100%","#5c9be0"],[last.pres,"Presupuestos","#9b5ce0","#b47ef0",r1?`${r1}%`:"—",r1?rCol(+r1,30,15):"#555"],[last.cierre,"Cierres","#4caf7d","#6dd49a",r2?`${r2}%`:"—",r2?rCol(+r2,20,10):"#555"]].map(([val,label,c1,c2,rate,rateCol])=>(
+                  <div key={label} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                    <div style={{minWidth:140,fontSize:11,color:dtext2,textAlign:"right"}}>{label}</div>
+                    <div style={{flex:1,background:dsurf2,borderRadius:4,height:26,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:4,background:`linear-gradient(90deg,${c1},${c2})`,width:`${pct(val)}%`,display:"flex",alignItems:"center",paddingLeft:8,fontSize:12,fontWeight:700,minWidth:30,transition:"width .6s"}}>{val}</div>
+                    </div>
+                    <div style={{minWidth:44,textAlign:"right",fontSize:12,fontWeight:700,color:rateCol}}>{rate}</div>
+                  </div>
+                ))}
+                <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${dborder}`,display:"flex",gap:20}}>
+                  {r3&&<div><div style={{fontSize:9,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Conversión total</div><div style={{fontSize:22,fontWeight:800,color:rCol(+r3,10,5)}}>{r3}%</div></div>}
+                  {last.monto>0&&<div><div style={{fontSize:9,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Monto cerrado</div><div style={{fontSize:22,fontWeight:800,color:"#c9a96e"}}>${Number(last.monto).toLocaleString("es-AR")}</div></div>}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Diagnóstico */}
+          <div style={{background:dsurf,border:`1px solid ${dborder}`,borderRadius:12,padding:20}}>
+            <div style={{fontSize:16,fontWeight:800,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:14}}>Diagnóstico</div>
+            {diag.map((d,i)=>{
+              const bc={good:"#4caf7d",warning:"#e09b3d",bad:"#e05c5c"}[d.lv];
+              return(<div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",borderRadius:8,border:`1px solid ${bc}30`,background:`${bc}08`,marginBottom:8}}>
+                <span style={{fontSize:16,flexShrink:0}}>{d.icon}</span>
+                <div><strong style={{display:"block",fontSize:12,color:dtext,marginBottom:2}}>{d.t}</strong><p style={{fontSize:11,color:dtext2,margin:0}}>{d.d}</p></div>
+              </div>);
+            })}
+          </div>
+
+          {/* Chart */}
+          <div style={{background:dsurf,border:`1px solid ${dborder}`,borderRadius:12,padding:20}}>
+            <div style={{fontSize:16,fontWeight:800,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:14}}>Evolución histórica</div>
+            {data.length<2?<div style={{color:dtext3,fontSize:13}}>Necesitás al menos 2 registros para ver el gráfico</div>:<canvas ref={chartRef} style={{display:"block",maxWidth:"100%"}}/>}
+          </div>
+
+          {/* Table */}
+          <div style={{background:dsurf,border:`1px solid ${dborder}`,borderRadius:12,padding:20}}>
+            <div style={{fontSize:16,fontWeight:800,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:14}}>Histórico</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr>{["Período","Msgs","Pres.","Cierres","Msg→Pres","Pres→Cierre","Monto",""].map(h=><th key={h} style={{textAlign:"left",padding:"7px 10px",color:dtext3,fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",borderBottom:`1px solid ${dborder}`}}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {data.length===0&&<tr><td colSpan={8} style={{textAlign:"center",color:dtext3,padding:16}}>Sin registros aún</td></tr>}
+                  {[...data].reverse().map(m=>{
+                    const mr1=m.msgs>0?((m.pres/m.msgs)*100).toFixed(0):"—";
+                    const mr2=m.pres>0?((m.cierre/m.pres)*100).toFixed(0):"—";
+                    return(<tr key={m.id} onMouseEnter={e=>e.currentTarget.querySelectorAll("td").forEach(td=>td.style.background=dsurf2)} onMouseLeave={e=>e.currentTarget.querySelectorAll("td").forEach(td=>td.style.background="")}>
+                      {[m.periodo,m.msgs,m.pres,m.cierre].map((v,i)=><td key={i} style={{padding:"8px 10px",borderBottom:`1px solid ${dborder}`,color:i===0?dtext:dtext2,fontWeight:i===0?600:400}}>{v}</td>)}
+                      <td style={{padding:"8px 10px",borderBottom:`1px solid ${dborder}`,color:mr1!=="—"?rCol(+mr1,30,15):dtext3,fontWeight:600}}>{mr1}{mr1!=="—"?"%":""}</td>
+                      <td style={{padding:"8px 10px",borderBottom:`1px solid ${dborder}`,color:mr2!=="—"?rCol(+mr2,20,10):dtext3,fontWeight:600}}>{mr2}{mr2!=="—"?"%":""}</td>
+                      <td style={{padding:"8px 10px",borderBottom:`1px solid ${dborder}`,color:dtext2}}>{m.monto>0?`$${Number(m.monto).toLocaleString("es-AR")}`:"—"}</td>
+                      <td style={{padding:"8px 10px",borderBottom:`1px solid ${dborder}`}}><button onClick={()=>deleteMetric(m.id)} style={{background:"none",border:"none",color:dtext3,cursor:"pointer",fontSize:13,padding:"2px 4px"}} onMouseEnter={e=>e.target.style.color="#e05c5c"} onMouseLeave={e=>e.target.style.color=dtext3}>✕</button></td>
+                    </tr>);
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── SIDEBAR ──────────────────────────────
-function Sidebar({ role, tab, setTab, onLogout, alertCount }) {
-  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount}];
+function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
+  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount},{id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},{id:"metrics",icon:<IMetrics/>,l:"Métricas"}];
   const vendedorItems = [{id:"chat",icon:<IChat/>,l:"Consultas IA"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"}];
   const items = role==="admin" ? adminItems : vendedorItems;
   return(
@@ -804,11 +1219,12 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount }) {
 function Panel({ role, onLogout, kb, setKb }) {
   const [tab,setTab]=useState("chat");
   const [alerts,setAlerts]=useState([]);
-  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento"};
+  const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(CRM_KEY)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
+  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas"};
   const desde = role==="admin"?"Administrador":"Vendedor";
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:"Outfit,sans-serif",background:T.gray50}}>
-      <Sidebar role={role} tab={tab} setTab={setTab} onLogout={onLogout} alertCount={alerts.length}/>
+      <Sidebar role={role} tab={tab} setTab={setTab} onLogout={onLogout} alertCount={alerts.length} crmBadge={crmUrgent}/>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{height:50,background:T.white,borderBottom:`1px solid ${T.gray200}`,display:"flex",alignItems:"center",padding:"0 24px",flexShrink:0}}>
           <div style={{fontSize:14,fontWeight:600,color:T.black}}>{tabLabels[tab]||""}</div>
@@ -821,6 +1237,8 @@ function Panel({ role, onLogout, kb, setKb }) {
           {tab==="kb"      && <KBView kb={kb} setKb={setKb}/>}
           {tab==="train"   && <div style={{display:"flex",height:"100%"}}><TrainView kb={kb} setKb={setKb}/></div>}
           {tab==="alerts"  && <AlertsView alerts={alerts} setAlerts={setAlerts} setKb={setKb}/>}
+          {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView/></div>}
+          {tab==="metrics" && <div style={{height:"100%",overflowY:"auto"}}><MetricasView/></div>}
         </div>
       </div>
     </div>
