@@ -303,7 +303,7 @@ const IUsers   = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a
 // ─── USUARIOS VIEW ────────────────────────
 function UsersView() {
   const [extra, setExtra]     = useState(getExtraUsers);
-  const [form, setForm]       = useState({user:"",pass:"",role:"vendedor",label:""});
+  const [form, setForm]       = useState({user:"",pass:"",role:"operador",label:""});
   const [err, setErr]         = useState("");
   const [ok, setOk]           = useState("");
   const [showPass, setShowPass] = useState({});
@@ -342,7 +342,12 @@ function UsersView() {
     setTimeout(()=>setOk(""),3000);
   };
 
-  const ROLE_LABELS = { admin:"Administrador", vendedor:"Vendedor" };
+  const ROLE_LABELS = { admin:"Administrador", operador:"Operador", vendedor:"Vendedor" };
+  const roleBadge = (role) => {
+    if(role==="admin")    return {bg:"#FEF9C3",col:"#854D0E"};
+    if(role==="operador") return {bg:"#EDE9FE",col:"#5B21B6"};
+    return {bg:"#F0FDF4",col:T.green};
+  };
 
   return (
     <div style={{padding:24,overflowY:"auto",height:"100%",maxWidth:760,margin:"0 auto"}}>
@@ -371,7 +376,8 @@ function UsersView() {
             <label style={{fontSize:11,color:T.gray500,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:6}}>Rol</label>
             <div style={{position:"relative"}}>
               <select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit",appearance:"none"}}>
-                <option value="vendedor">Vendedor — acceso básico</option>
+                <option value="operador">Operador — acceso amplio (recomendado)</option>
+                <option value="vendedor">Vendedor — solo chat, calculadora y catálogo</option>
                 <option value="admin">Administrador — acceso total</option>
               </select>
               <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
@@ -406,7 +412,7 @@ function UsersView() {
                     </td>
                     <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`,color:T.black}}>{d.label}</td>
                     <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`}}>
-                      <span style={{padding:"3px 9px",borderRadius:5,fontSize:11,fontWeight:600,background:d.role==="admin"?"#FEF9C3":"#F0FDF4",color:d.role==="admin"?"#854D0E":T.green}}>{ROLE_LABELS[d.role]||d.role}</span>
+                      <span style={{padding:"3px 9px",borderRadius:5,fontSize:11,fontWeight:600,background:roleBadge(d.role).bg,color:roleBadge(d.role).col}}>{ROLE_LABELS[d.role]||d.role}</span>
                     </td>
                     <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`,fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:T.gray400}}>
                       {builtin ? "••••••••••" : (showPass[u] ? d.pass : "••••••••")}
@@ -428,7 +434,7 @@ function UsersView() {
           </table>
         </div>
         <div style={{marginTop:14,padding:"10px 14px",background:T.gray50,borderRadius:8,fontSize:12,color:T.gray500,lineHeight:1.6}}>
-          💡 Los usuarios con acceso <strong>Vendedor</strong> ven: Chat IA, Calculadora y Catálogo. Los <strong>Administradores</strong> tienen acceso completo a todas las secciones.
+          💡 <strong>Vendedor:</strong> Chat IA, Calculadora y Catálogo. &nbsp;·&nbsp; <strong>Operador:</strong> todo excepto Alertas, Entrenar IA, Conocimiento, config. de logística y Usuarios. &nbsp;·&nbsp; <strong>Administrador:</strong> acceso total.
         </div>
       </div>
     </div>
@@ -518,19 +524,19 @@ const COT_CSS = `
 .cot-body .damian-min{font-size:30px;font-weight:700;}
 `;
 
-function CotizadorView() {
+function CotizadorView({ role="admin" }) {
   const [cotTab, setCotTab] = useState('amba-calc');
 
-
-  const tabs = [
+  const allTabs = [
     {id:'amba-calc',   label:'Calcular flete',    group:'Envíos AMBA'},
     {id:'amba-zonas',  label:'Zonas guardadas',    group:'Envíos AMBA'},
-    {id:'amba-config', label:'Choferes y tarifas', group:'Envíos AMBA'},
-    {id:'exp-estimar',   label:'Estimar envío',      group:'Expressos'},
-    {id:'exp-historial', label:'Cargar cotización',  group:'Expressos'},
-    {id:'exp-resumen',   label:'Resumen',            group:'Expressos'},
-    {id:'exp-config',    label:'Configuración',      group:'Expressos'},
+    {id:'amba-config', label:'Choferes y tarifas', group:'Envíos AMBA', adminOnly:true},
+    {id:'exp-estimar',   label:'Estimar envío',     group:'Expressos'},
+    {id:'exp-historial', label:'Cargar cotización', group:'Expressos'},
+    {id:'exp-resumen',   label:'Resumen',           group:'Expressos'},
+    {id:'exp-config',    label:'Configuración',     group:'Expressos', adminOnly:true},
   ];
+  const tabs = allTabs.filter(t => !t.adminOnly || role === 'admin');
 
   useEffect(() => {
     // Inject font and CSS
@@ -2134,8 +2140,17 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
     {divider:true},
     {id:"usuarios",icon:<IUsers/>,l:"Usuarios"},
   ];
+  const operadorItems = [
+    {id:"chat",icon:<IChat/>,l:"Chat + Corrección"},
+    {id:"calc",icon:<ICalc/>,l:"Calculadora"},
+    {id:"catalog",icon:<ICatalog/>,l:"Catálogo"},
+    {divider:true},
+    {id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},
+    {id:"metrics",icon:<IMetrics/>,l:"Métricas"},
+    {id:"cotizador",icon:<IEnvios/>,l:"Cotizador Envíos"},
+  ];
   const vendedorItems = [{id:"chat",icon:<IChat/>,l:"Consultas IA"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"}];
-  const items = role==="admin" ? adminItems : vendedorItems;
+  const items = role==="admin" ? adminItems : role==="operador" ? operadorItems : vendedorItems;
   return(
     <div style={{width:210,background:T.black,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0}}>
       <div style={{padding:"22px 18px 16px"}}>
@@ -2190,7 +2205,7 @@ function Panel({ role, onLogout, kb, setKb }) {
           {tab==="alerts"  && <AlertsView alerts={alerts} setAlerts={setAlerts} setKb={setKb}/>}
           {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView/></div>}
           {tab==="metrics" && <div style={{height:"100%",overflowY:"auto"}}><MetricasView/></div>}
-          {tab==="cotizador" && <div style={{height:"100%",overflow:"hidden"}}><CotizadorView/></div>}
+          {tab==="cotizador" && <div style={{height:"100%",overflow:"hidden"}}><CotizadorView role={role}/></div>}
           {tab==="usuarios"  && <UsersView/>}
         </div>
       </div>
@@ -2233,8 +2248,9 @@ export default function App() {
     <div>
       <style>{`${GF}*{box-sizing:border-box;margin:0;padding:0;}body,button,input,textarea,select{font-family:'Outfit',sans-serif;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#D1D1D1;border-radius:4px;}@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {!session&&<Login onLogin={(u,r,l)=>setSession({u,r,l})}/>}
-      {session?.r==="admin"   &&<Panel role="admin"    onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
-      {session?.r==="vendedor"&&<Panel role="vendedor" onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
+      {session?.r==="admin"    &&<Panel role="admin"    onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
+      {session?.r==="operador" &&<Panel role="operador" onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
+      {session?.r==="vendedor" &&<Panel role="vendedor" onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
       {session?.r==="client"  &&<ClientView kb={kb} onLogout={()=>setSession(null)}/>}
     </div>
   );
