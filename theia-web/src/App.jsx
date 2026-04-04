@@ -1734,8 +1734,9 @@ const lsGet = (k,def) => { try{ const v=localStorage.getItem(k); return v!=null?
 const lsSet = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
 
 // ─── CRM VIEW ─────────────────────────────
-function CRMView() {
-  const [clients, setClients]       = useState(() => lsGet(CRM_KEY,[]));
+function CRMView({ username }) {
+  const userCrmKey = `${CRM_KEY}_${username||"default"}`;
+  const [clients, setClients]       = useState(() => lsGet(userCrmKey,[]));
   const [modal, setModal]           = useState(null); // null | "new" | "edit" | "log"
   const [editId, setEditId]         = useState(null);
   const [logId, setLogId]           = useState(null);
@@ -1748,7 +1749,7 @@ function CRMView() {
   const [logEstado, setLogEstado]   = useState("");
   const [logProxima, setLogProxima] = useState("");
 
-  const save = (arr) => { setClients(arr); lsSet(CRM_KEY,arr); };
+  const save = (arr) => { setClients(arr); lsSet(userCrmKey,arr); };
 
   const openNew = () => {
     setEditId(null);
@@ -2182,10 +2183,11 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
 }
 
 // ─── PANEL ────────────────────────────────
-function Panel({ role, onLogout, kb, setKb }) {
+function Panel({ role, username, onLogout, kb, setKb }) {
   const [tab,setTab]=useState("chat");
   const [alerts,setAlerts]=useState([]);
-  const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(CRM_KEY)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
+  const userCrmKey = `${CRM_KEY}_${username||"default"}`;
+  const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(userCrmKey)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
   const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas",cotizador:"Cotizador de Envíos",usuarios:"Gestión de Usuarios"};
   const desde = role==="admin"?"Administrador":"Vendedor";
   return(
@@ -2203,7 +2205,7 @@ function Panel({ role, onLogout, kb, setKb }) {
           {tab==="kb"      && <KBView kb={kb} setKb={setKb}/>}
           {tab==="train"   && <div style={{display:"flex",height:"100%"}}><TrainView kb={kb} setKb={setKb}/></div>}
           {tab==="alerts"  && <AlertsView alerts={alerts} setAlerts={setAlerts} setKb={setKb}/>}
-          {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView/></div>}
+          {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView username={username}/></div>}
           {tab==="metrics" && <div style={{height:"100%",overflowY:"auto"}}><MetricasView/></div>}
           {tab==="cotizador" && <div style={{height:"100%",overflow:"hidden"}}><CotizadorView role={role}/></div>}
           {tab==="usuarios"  && <UsersView/>}
@@ -2248,9 +2250,9 @@ export default function App() {
     <div>
       <style>{`${GF}*{box-sizing:border-box;margin:0;padding:0;}body,button,input,textarea,select{font-family:'Outfit',sans-serif;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#D1D1D1;border-radius:4px;}@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {!session&&<Login onLogin={(u,r,l)=>setSession({u,r,l})}/>}
-      {session?.r==="admin"    &&<Panel role="admin"    onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
-      {session?.r==="operador" &&<Panel role="operador" onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
-      {session?.r==="vendedor" &&<Panel role="vendedor" onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
+      {session?.r==="admin"    &&<Panel role="admin"    username={session.u} onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
+      {session?.r==="operador" &&<Panel role="operador" username={session.u} onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
+      {session?.r==="vendedor" &&<Panel role="vendedor" username={session.u} onLogout={()=>setSession(null)} kb={kb} setKb={setKb}/>}
       {session?.r==="client"  &&<ClientView kb={kb} onLogout={()=>setSession(null)}/>}
     </div>
   );
