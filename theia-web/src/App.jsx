@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const GF = "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');";
 const T = {
@@ -300,6 +300,7 @@ const COT_CSS = `
 .cot-wrap{font-family:'DM Sans',sans-serif;background:#f5f4f0;min-height:100%;display:flex;flex-direction:column;}
 .cot-wrap *{box-sizing:border-box;}
 .cot-subnav{display:flex;gap:2px;flex-wrap:wrap;padding:14px 20px 0;background:#fff;border-bottom:1px solid rgba(0,0,0,0.09);}
+.cot-subnav>div[style]{display:contents;}
 .cot-subnav-section{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#a8a8a3;padding:0 10px 12px;display:flex;align-items:flex-end;}
 .cot-tab{padding:8px 14px 10px;border:none;border-bottom:2px solid transparent;background:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:#737373;cursor:pointer;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
 .cot-tab:hover{color:#1a1a18;}
@@ -379,7 +380,7 @@ const COT_CSS = `
 
 function CotizadorView() {
   const [cotTab, setCotTab] = useState('amba-calc');
-  const initDone = useRef(false);
+
 
   const tabs = [
     {id:'amba-calc', label:'Calcular flete', group:'Envíos AMBA'},
@@ -404,8 +405,6 @@ function CotizadorView() {
       l.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap';
       document.head.appendChild(l);
     }
-    if (initDone.current) return;
-    initDone.current = true;
 
     // ── Storage ──
     window.cotLd = (k,d)=>{try{const v=localStorage.getItem('theia_'+k);return v?JSON.parse(v):d;}catch(e){return d;}};
@@ -705,12 +704,12 @@ function CotizadorView() {
       {/* Sub-nav */}
       <div className="cot-subnav">
         {groups.map(g=>(
-          <React.Fragment key={g}>
+          <div key={g} style={{display:'contents'}}>
             <div className="cot-subnav-section">{g}</div>
             {tabs.filter(t=>t.group===g).map(t=>(
               <button key={t.id} className={`cot-tab${cotTab===t.id?' cot-active':''}`} onClick={()=>setCotTab(t.id)}>{t.label}</button>
             ))}
-          </React.Fragment>
+          </div>
         ))}
       </div>
 
