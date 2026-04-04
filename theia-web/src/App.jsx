@@ -13,6 +13,10 @@ const USERS = {
   sociostheia: { pass:"theiadesing25",  role:"admin",    label:"Administrador" },
   theiaventas: { pass:"libertador6501", role:"vendedor", label:"Vendedor"      },
 };
+const EXTRA_USERS_KEY = "theia_users_v2";
+const getExtraUsers = () => { try{ return JSON.parse(localStorage.getItem(EXTRA_USERS_KEY)||"{}"); }catch{ return {}; } };
+const getEffectiveUsers = () => ({ ...USERS, ...getExtraUsers() });
+const saveExtraUsers = (obj) => localStorage.setItem(EXTRA_USERS_KEY, JSON.stringify(obj));
 const OWNER_WA = "541134423383";
 const SHEET_ID = "1N4p7U1umPDv3umT38f6zTyKQSjO7vmIIwPdmVe6xt1Y";
 
@@ -294,8 +298,144 @@ const IWA = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="#16A34A"
 const ICRM     = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>;
 const IMetrics = ()       => <Ic d="M18 20V10M12 20V4M6 20v-6"/>;
 const IEnvios  = ()       => <Ic d="M1 3h15v13H1zM16 8l4 2v6h-4M5 16a2 2 0 100 4 2 2 0 000-4zM12 16a2 2 0 100 4 2 2 0 000-4z"/>;
+const IUsers   = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>;
 
-// ─── COTIZADOR VIEW ───────────────────────
+// ─── USUARIOS VIEW ────────────────────────
+function UsersView() {
+  const [extra, setExtra]     = useState(getExtraUsers);
+  const [form, setForm]       = useState({user:"",pass:"",role:"vendedor",label:""});
+  const [err, setErr]         = useState("");
+  const [ok, setOk]           = useState("");
+  const [showPass, setShowPass] = useState({});
+
+  const allUsers = getEffectiveUsers();
+  const isBuiltin = (u) => !!USERS[u];
+
+  const save = (obj) => { saveExtraUsers(obj); setExtra({...obj}); };
+
+  const addUser = () => {
+    setErr(""); setOk("");
+    const u = form.user.trim().toLowerCase();
+    if (!u || !form.pass || !form.label.trim()) { setErr("Completá usuario, contraseña y nombre."); return; }
+    if (!/^[a-z0-9_]{3,30}$/.test(u)) { setErr("El usuario solo puede tener letras, números y _ (3-30 caracteres)."); return; }
+    if (allUsers[u]) { setErr("Ese usuario ya existe."); return; }
+    const updated = { ...getExtraUsers(), [u]: { pass: form.pass, role: form.role, label: form.label.trim() } };
+    save(updated);
+    setForm({user:"",pass:"",role:"vendedor",label:""});
+    setOk(`Usuario "${u}" creado ✓`);
+    setTimeout(()=>setOk(""),3000);
+  };
+
+  const deleteUser = (u) => {
+    if (!window.confirm(`¿Eliminar al usuario "${u}"?`)) return;
+    const updated = { ...getExtraUsers() };
+    delete updated[u];
+    save(updated);
+  };
+
+  const resetPass = (u) => {
+    const np = window.prompt(`Nueva contraseña para "${u}":`);
+    if (!np || np.length < 4) { alert("La contraseña debe tener al menos 4 caracteres."); return; }
+    const updated = { ...getExtraUsers(), [u]: { ...extra[u], pass: np } };
+    save(updated);
+    setOk(`Contraseña de "${u}" actualizada ✓`);
+    setTimeout(()=>setOk(""),3000);
+  };
+
+  const ROLE_LABELS = { admin:"Administrador", vendedor:"Vendedor" };
+
+  return (
+    <div style={{padding:24,overflowY:"auto",height:"100%",maxWidth:760,margin:"0 auto"}}>
+      <div style={{marginBottom:22}}>
+        <h2 style={{fontSize:20,fontWeight:700,color:T.black}}>Gestión de Usuarios</h2>
+        <p style={{color:T.gray500,fontSize:13,marginTop:4}}>Administrá los accesos a la plataforma. Los usuarios base del sistema no pueden modificarse desde aquí.</p>
+      </div>
+
+      {/* Add user */}
+      <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:20,marginBottom:20}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:T.black}}>Agregar nuevo usuario</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div>
+            <label style={{fontSize:11,color:T.gray500,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:6}}>Nombre para mostrar</label>
+            <input value={form.label} onChange={e=>setForm(p=>({...p,label:e.target.value}))} placeholder="Ej: María García" style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:T.gray500,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:6}}>Nombre de usuario</label>
+            <input value={form.user} onChange={e=>setForm(p=>({...p,user:e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"")}))} placeholder="Ej: mgarcía → mgarcia" style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:T.gray500,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:6}}>Contraseña</label>
+            <input type="text" value={form.pass} onChange={e=>setForm(p=>({...p,pass:e.target.value}))} placeholder="Mínimo 4 caracteres" style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:T.gray500,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:6}}>Rol</label>
+            <div style={{position:"relative"}}>
+              <select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit",appearance:"none"}}>
+                <option value="vendedor">Vendedor — acceso básico</option>
+                <option value="admin">Administrador — acceso total</option>
+              </select>
+              <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+            </div>
+          </div>
+        </div>
+        {err && <div style={{background:T.redLight,border:`1px solid #FECACA`,borderRadius:7,padding:"9px 14px",fontSize:12.5,color:T.red,marginBottom:10}}>{err}</div>}
+        {ok  && <div style={{background:T.greenLight,border:`1px solid #BBF7D0`,borderRadius:7,padding:"9px 14px",fontSize:12.5,color:T.green,marginBottom:10}}>{ok}</div>}
+        <button onClick={addUser} style={{padding:"9px 22px",borderRadius:8,background:T.black,border:"none",color:T.white,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ Crear usuario</button>
+      </div>
+
+      {/* Users table */}
+      <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:20}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:T.black}}>Usuarios activos</div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead>
+              <tr>
+                {["Usuario","Nombre","Rol","Contraseña","Acciones"].map(h=>(
+                  <th key={h} style={{textAlign:"left",padding:"7px 10px",color:T.gray500,fontSize:11,textTransform:"uppercase",letterSpacing:"0.05em",borderBottom:`1px solid ${T.gray200}`,fontWeight:600}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(allUsers).map(([u,d])=>{
+                const builtin = isBuiltin(u);
+                return(
+                  <tr key={u} onMouseEnter={e=>e.currentTarget.style.background=T.gray50} onMouseLeave={e=>e.currentTarget.style.background=""}>
+                    <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`,fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:T.black,fontWeight:600}}>
+                      {u}
+                      {builtin && <span style={{marginLeft:7,background:T.gray100,color:T.gray500,borderRadius:4,padding:"2px 6px",fontSize:10,fontWeight:600,verticalAlign:"middle"}}>sistema</span>}
+                    </td>
+                    <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`,color:T.black}}>{d.label}</td>
+                    <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`}}>
+                      <span style={{padding:"3px 9px",borderRadius:5,fontSize:11,fontWeight:600,background:d.role==="admin"?"#FEF9C3":"#F0FDF4",color:d.role==="admin"?"#854D0E":T.green}}>{ROLE_LABELS[d.role]||d.role}</span>
+                    </td>
+                    <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`,fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:T.gray400}}>
+                      {builtin ? "••••••••••" : (showPass[u] ? d.pass : "••••••••")}
+                      {!builtin && <button onClick={()=>setShowPass(p=>({...p,[u]:!p[u]}))} style={{background:"none",border:"none",color:T.gray400,cursor:"pointer",marginLeft:6,padding:0,fontSize:12}}>{showPass[u]?"🙈":"👁"}</button>}
+                    </td>
+                    <td style={{padding:"10px 10px",borderBottom:`1px solid ${T.gray100}`}}>
+                      {!builtin && (
+                        <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>resetPass(u)} style={{padding:"4px 10px",borderRadius:5,border:`1px solid ${T.gray200}`,background:"none",color:T.gray600,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>Cambiar pass</button>
+                          <button onClick={()=>deleteUser(u)} style={{padding:"4px 10px",borderRadius:5,border:`1px solid #FECACA`,background:"none",color:T.red,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>Eliminar</button>
+                        </div>
+                      )}
+                      {builtin && <span style={{fontSize:11,color:T.gray300}}>No editable</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{marginTop:14,padding:"10px 14px",background:T.gray50,borderRadius:8,fontSize:12,color:T.gray500,lineHeight:1.6}}>
+          💡 Los usuarios con acceso <strong>Vendedor</strong> ven: Chat IA, Calculadora y Catálogo. Los <strong>Administradores</strong> tienen acceso completo a todas las secciones.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SIDEBAR ──────────────────────────────
 const COT_CSS = `
 .cot-wrap{font-family:'DM Sans',sans-serif;background:#f5f4f0;min-height:100%;display:flex;flex-direction:column;}
 .cot-wrap *{box-sizing:border-box;}
@@ -383,12 +523,13 @@ function CotizadorView() {
 
 
   const tabs = [
-    {id:'amba-calc', label:'Calcular flete', group:'Envíos AMBA'},
-    {id:'amba-zonas', label:'Zonas guardadas', group:'Envíos AMBA'},
-    {id:'exp-estimar', label:'Estimar envío', group:'Expressos'},
-    {id:'exp-historial', label:'Cargar cotización', group:'Expressos'},
-    {id:'exp-resumen', label:'Resumen', group:'Expressos'},
-    {id:'exp-config', label:'Configuración', group:'Expressos'},
+    {id:'amba-calc',   label:'Calcular flete',    group:'Envíos AMBA'},
+    {id:'amba-zonas',  label:'Zonas guardadas',    group:'Envíos AMBA'},
+    {id:'amba-config', label:'Choferes y tarifas', group:'Envíos AMBA'},
+    {id:'exp-estimar',   label:'Estimar envío',      group:'Expressos'},
+    {id:'exp-historial', label:'Cargar cotización',  group:'Expressos'},
+    {id:'exp-resumen',   label:'Resumen',            group:'Expressos'},
+    {id:'exp-config',    label:'Configuración',      group:'Expressos'},
   ];
 
   useEffect(() => {
@@ -413,7 +554,15 @@ function CotizadorView() {
     window.cotFmtD = (n,d)=>parseFloat(n).toFixed(d!=null?d:1);
 
     // ── AMBA constants ──
-    window.COT_AR=35000; window.COT_OR=45000; window.COT_LM=30; window.COT_UM=30;
+    // Load AMBA config (names, rates, min)
+    const DEFAULT_AMBA = {
+      angel:  {name:'Angel',  rate:35000, sb:'Carga chica',   nt:'Largo < 290 cm',   largo_max:290},
+      oscar:  {name:'Oscar',  rate:45000, sb:'Carga mediana', nt:'Cargas medianas',   largo_max:0},
+      damian: {name:'Damián', min:200000, sb:'Carga grande',  nt:'Mínimo $200.000'},
+    };
+    window.ambaCfg = window.cotLd('amba_cfg', DEFAULT_AMBA);
+    window.COT_AR=window.ambaCfg.angel.rate; window.COT_OR=window.ambaCfg.oscar.rate;
+    window.COT_LM=30; window.COT_UM=30;
     window.ambDests=window.cotLd('amb_dests',[]);
     window.ambVeh=null; window.aiEstimado=null;
 
@@ -430,6 +579,7 @@ function CotizadorView() {
     };
 
     window.estimarTiempo = async () => {
+      const origen=(document.getElementById('ao-origen-txt')||{}).value?.trim()||'Av. Rodríguez Peña 3919, Quilmes, Buenos Aires';
       const destino=(document.getElementById('ao-destino-txt')||{}).value?.trim()||'';
       if(!destino){alert('Escribí un destino primero.');return;}
       const btn=document.getElementById('btn-estimar');
@@ -443,7 +593,7 @@ function CotizadorView() {
         const resp=await fetch('https://api.anthropic.com/v1/messages',{
           method:'POST',
           headers:{'Content-Type':'application/json','x-api-key':AK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:`Sos experto en logística del Gran Buenos Aires. Estimá el tiempo de viaje en camioneta/camión de reparto desde Av. Rodríguez Peña 3919, Quilmes, Buenos Aires hasta "${destino}" (zona AMBA), considerando tráfico normal de día laboral.\n\nRespondé SOLO con JSON válido, sin texto adicional ni markdown:\n{"minutos":ENTERO,"rango":"MIN-MAX min","ruta":"descripción breve de la ruta principal","confianza":"alta|media|baja"}`}]})
+          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:`Sos experto en logística del Gran Buenos Aires. Estimá el tiempo de viaje en camioneta/camión de reparto desde "${origen}" hasta "${destino}" (zona AMBA), considerando tráfico normal de día laboral.\n\nRespondé SOLO con JSON válido, sin texto adicional ni markdown:\n{"minutos":ENTERO,"rango":"MIN-MAX min","ruta":"descripción breve de la ruta principal","confianza":"alta|media|baja"}`}]})
         });
         const data=await resp.json();
         const txt=data.content.map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
@@ -491,7 +641,7 @@ function CotizadorView() {
       const tsExacto=hh>0?(mm>0?`${hh}h ${mm}min`:`${hh}h`):`${mm}min`;
       const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
       set('bk-ida',t+' min');set('bk-total',`${tot} min (${tsExacto})`);
-      set('bk-rate-lbl',`${window.ambVeh==='angel'?'Angel':'Oscar'} · $${window.cotFmt(rate)}/hr`);
+      set('bk-rate-lbl',`${window.ambVeh==='angel'?window.ambaCfg.angel.name:window.ambaCfg.oscar.name} · $${window.cotFmt(rate)}/hr`);
       set('bk-precio','$'+window.cotFmt(cost));
       set('bk-horas',`${horas} hora${horas>1?'s':''} facturada${horas>1?'s':''} (redondeo para arriba)`);
       if(rEl)rEl.style.display='block';
@@ -531,6 +681,57 @@ function CotizadorView() {
         const tot=window.COT_LM+d.minutos+window.COT_UM,h=Math.ceil(tot/60);
         return`<tr><td style="font-weight:500;">${d.name}</td><td style="text-align:right;">${d.minutos} min</td><td style="text-align:right;">$${window.cotFmt(h*window.COT_AR)}</td><td style="text-align:right;">$${window.cotFmt(h*window.COT_OR)}</td><td style="color:#6b6b66;">${d.notas||'—'}</td><td><button class="btn-ghost" onclick="delAmbDest(${d.id})">✕</button></td></tr>`;
       }).join('');
+    };
+
+    window.saveAmbaCfg = () => {
+      const g = (id) => (document.getElementById(id)||{}).value||'';
+      window.ambaCfg.angel.name  = g('cfg-angel-name') || 'Angel';
+      window.ambaCfg.angel.rate  = parseFloat(g('cfg-angel-rate'))  || 35000;
+      window.ambaCfg.angel.sb    = g('cfg-angel-sb')   || 'Carga chica';
+      window.ambaCfg.angel.nt    = g('cfg-angel-nt')   || 'Largo < 290 cm';
+      window.ambaCfg.angel.largo_max = parseFloat(g('cfg-angel-max')) || 290;
+      window.ambaCfg.oscar.name  = g('cfg-oscar-name') || 'Oscar';
+      window.ambaCfg.oscar.rate  = parseFloat(g('cfg-oscar-rate'))  || 45000;
+      window.ambaCfg.oscar.sb    = g('cfg-oscar-sb')   || 'Carga mediana';
+      window.ambaCfg.oscar.nt    = g('cfg-oscar-nt')   || 'Cargas medianas';
+      window.ambaCfg.damian.name = g('cfg-damian-name')|| 'Damián';
+      window.ambaCfg.damian.min  = parseFloat(g('cfg-damian-min')) || 200000;
+      window.ambaCfg.damian.sb   = g('cfg-damian-sb')  || 'Carga grande';
+      window.ambaCfg.damian.nt   = g('cfg-damian-nt')  || `Mínimo $${window.cotFmt(window.ambaCfg.damian.min)}`;
+      window.COT_AR = window.ambaCfg.angel.rate;
+      window.COT_OR = window.ambaCfg.oscar.rate;
+      window.cotSv('amba_cfg', window.ambaCfg);
+      // Update veh cards
+      window.updateVehCards();
+      const ok=document.getElementById('amba-cfg-ok');
+      if(ok){ok.style.display='inline';setTimeout(()=>ok.style.display='none',2200);}
+    };
+
+    window.loadAmbaCfgForm = () => {
+      const s = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
+      const c = window.ambaCfg;
+      s('cfg-angel-name', c.angel.name);  s('cfg-angel-rate', c.angel.rate);
+      s('cfg-angel-sb',   c.angel.sb);    s('cfg-angel-nt',   c.angel.nt);
+      s('cfg-angel-max',  c.angel.largo_max||290);
+      s('cfg-oscar-name', c.oscar.name);  s('cfg-oscar-rate', c.oscar.rate);
+      s('cfg-oscar-sb',   c.oscar.sb);    s('cfg-oscar-nt',   c.oscar.nt);
+      s('cfg-damian-name',c.damian.name); s('cfg-damian-min', c.damian.min);
+      s('cfg-damian-sb',  c.damian.sb);   s('cfg-damian-nt',  c.damian.nt);
+    };
+
+    window.updateVehCards = () => {
+      const c = window.ambaCfg;
+      const upd = (id, cfg, extra) => {
+        const card=document.getElementById('vc-'+id); if(!card)return;
+        const nm=card.querySelector('.veh-nm'); if(nm)nm.textContent=cfg.name;
+        const sb=card.querySelector('.veh-sb'); if(sb)sb.textContent=cfg.sb;
+        const nt=card.querySelector('.veh-nt'); if(nt)nt.textContent=extra.nt;
+        const rt=card.querySelector('.veh-rt'); if(rt)rt.textContent=extra.rt;
+        const av=card.querySelector('.veh-av'); if(av)av.textContent=cfg.name[0];
+      };
+      upd('angel',  c.angel,  {nt:c.angel.nt,   rt:`$${window.cotFmt(c.angel.rate)}/hr`});
+      upd('oscar',  c.oscar,  {nt:c.oscar.nt,   rt:`$${window.cotFmt(c.oscar.rate)}/hr`});
+      upd('damian', c.damian, {nt:c.damian.nt||`Mínimo $${window.cotFmt(c.damian.min)}`, rt:'A cotizar'});
     };
 
     // ── Expressos ──
@@ -678,6 +879,7 @@ function CotizadorView() {
     setTimeout(()=>{
       window.renderAmbDestSel();
       window.feInitSels();
+      window.updateVehCards?.();
       const hf=document.getElementById('h-fecha');
       if(hf){const now=new Date();hf.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;}
       const cd=document.getElementById('cfg-div');if(cd)cd.value=window.feCfg.div;
@@ -690,6 +892,7 @@ function CotizadorView() {
   useEffect(()=>{
     setTimeout(()=>{
       if(cotTab==='amba-zonas') window.renderAmbDestsTable?.();
+      if(cotTab==='amba-config') window.loadAmbaCfgForm?.();
       if(cotTab==='exp-historial'){window.feRenderHSel?.();window.feRenderHTable?.();}
       if(cotTab==='exp-resumen') window.feRenderResumen?.();
       if(cotTab==='exp-config'){const cd=document.getElementById('cfg-div');if(cd)cd.value=window.feCfg?.div||6000;window.feRenderDestTable?.();}
@@ -732,14 +935,24 @@ function CotizadorView() {
             </div>
             <div id="ao-form" style={{display:'none'}}>
               <div className="ai-box">
-                <div className="card-title">Destino</div>
+                <div className="card-title">Origen y destino</div>
+                <div className="fg">
+                  <label className="lbl">Origen (punto de partida)</label>
+                  <input
+                    type="text"
+                    id="ao-origen-txt"
+                    placeholder="Ej: Av. Rodríguez Peña 3919, Quilmes"
+                    defaultValue="Av. Rodríguez Peña 3919, Quilmes"
+                    style={{width:'100%'}}
+                  />
+                </div>
                 <div className="fg">
                   <label className="lbl">Zona guardada (acceso rápido)</label>
                   <select id="ao-dest-sel" onChange={()=>window.aoDestSel()} style={{width:'100%'}}>
                     <option value="">— Seleccioná una zona guardada —</option>
                   </select>
                 </div>
-                <label className="lbl">O escribí la dirección / zona</label>
+                <label className="lbl">O escribí la dirección / zona de destino</label>
                 <div className="ai-input-row">
                   <input type="text" id="ao-destino-txt" placeholder="Ej: Palermo CABA · San Isidro · Av. Santa Fe 2000" style={{flex:1}} onKeyDown={e=>{if(e.key==='Enter')window.estimarTiempo();}}/>
                   <button className="btn btn-accent btn-sm" id="btn-estimar" onClick={()=>window.estimarTiempo()}>Estimar tiempo ↗</button>
@@ -817,6 +1030,63 @@ function CotizadorView() {
                   <tbody id="ad-tbody"></tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* AMBA CONFIG */}
+        {cotTab==='amba-config' && (
+          <div>
+            <p className="hint" style={{marginBottom:20}}>Configurá los nombres, tarifas y descripciones de cada chofer. Los cambios se aplican inmediatamente en el calculador de flete.</p>
+
+            {/* Angel */}
+            <div className="card">
+              <div className="card-title" style={{display:'flex',alignItems:'center',gap:10}}>
+                <div className="veh-av" style={{margin:0,width:34,height:34,fontSize:14}}>A</div>
+                Chofer 1 — Carga chica
+              </div>
+              <div className="g2">
+                <div><label className="lbl">Nombre</label><input type="text" id="cfg-angel-name" placeholder="Angel"/></div>
+                <div><label className="lbl">Tarifa ($/hora)</label><input type="number" id="cfg-angel-rate" placeholder="35000" min="0"/></div>
+                <div><label className="lbl">Descripción corta</label><input type="text" id="cfg-angel-sb" placeholder="Carga chica"/></div>
+                <div><label className="lbl">Límite de largo (cm)</label><input type="number" id="cfg-angel-max" placeholder="290" min="0"/></div>
+                <div className="g2" style={{gridColumn:'1/-1',margin:0}}>
+                  <div><label className="lbl">Nota / restricción visible</label><input type="text" id="cfg-angel-nt" placeholder="Largo < 290 cm"/></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Oscar */}
+            <div className="card">
+              <div className="card-title" style={{display:'flex',alignItems:'center',gap:10}}>
+                <div className="veh-av" style={{margin:0,width:34,height:34,fontSize:14}}>O</div>
+                Chofer 2 — Carga mediana
+              </div>
+              <div className="g2">
+                <div><label className="lbl">Nombre</label><input type="text" id="cfg-oscar-name" placeholder="Oscar"/></div>
+                <div><label className="lbl">Tarifa ($/hora)</label><input type="number" id="cfg-oscar-rate" placeholder="45000" min="0"/></div>
+                <div><label className="lbl">Descripción corta</label><input type="text" id="cfg-oscar-sb" placeholder="Carga mediana"/></div>
+                <div><label className="lbl">Nota visible</label><input type="text" id="cfg-oscar-nt" placeholder="Cargas medianas"/></div>
+              </div>
+            </div>
+
+            {/* Damián */}
+            <div className="card">
+              <div className="card-title" style={{display:'flex',alignItems:'center',gap:10}}>
+                <div className="veh-av" style={{margin:0,width:34,height:34,fontSize:14}}>D</div>
+                Chofer 3 — Carga grande
+              </div>
+              <div className="g2">
+                <div><label className="lbl">Nombre</label><input type="text" id="cfg-damian-name" placeholder="Damián"/></div>
+                <div><label className="lbl">Precio mínimo ($)</label><input type="number" id="cfg-damian-min" placeholder="200000" min="0"/></div>
+                <div><label className="lbl">Descripción corta</label><input type="text" id="cfg-damian-sb" placeholder="Carga grande"/></div>
+                <div><label className="lbl">Nota visible</label><input type="text" id="cfg-damian-nt" placeholder="Mínimo $200.000"/></div>
+              </div>
+            </div>
+
+            <div className="row-btns">
+              <button className="btn btn-accent" onClick={()=>window.saveAmbaCfg()}>Guardar cambios</button>
+              <span className="ok-msg" id="amba-cfg-ok">✓ Guardado y aplicado</span>
             </div>
           </div>
         )}
@@ -1333,7 +1603,7 @@ function Login({ onLogin }) {
   const go = async () => {
     if (!u || !p) return;
     setErr(""); setLoading(true); await new Promise(r=>setTimeout(r,500));
-    const usr = USERS[u.trim().toLowerCase()];
+    const usr = getEffectiveUsers()[u.trim().toLowerCase()];
     if (usr && usr.pass===p) { onLogin(u.trim().toLowerCase(), usr.role, usr.label); }
     else setErr("Usuario o contraseña incorrectos");
     setLoading(false);
@@ -1849,9 +2119,21 @@ function MetricasView() {
   );
 }
 
-// ─── SIDEBAR ──────────────────────────────
 function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
-  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount},{id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},{id:"metrics",icon:<IMetrics/>,l:"Métricas"},{id:"cotizador",icon:<IEnvios/>,l:"Cotizador Envíos"}];
+  const adminItems = [
+    {id:"chat",icon:<IChat/>,l:"Chat + Corrección"},
+    {id:"calc",icon:<ICalc/>,l:"Calculadora"},
+    {id:"catalog",icon:<ICatalog/>,l:"Catálogo"},
+    {id:"kb",icon:<IKB/>,l:"Conocimiento"},
+    {id:"train",icon:<IBrain/>,l:"Entrenar IA"},
+    {id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount},
+    {divider:true},
+    {id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},
+    {id:"metrics",icon:<IMetrics/>,l:"Métricas"},
+    {id:"cotizador",icon:<IEnvios/>,l:"Cotizador Envíos"},
+    {divider:true},
+    {id:"usuarios",icon:<IUsers/>,l:"Usuarios"},
+  ];
   const vendedorItems = [{id:"chat",icon:<IChat/>,l:"Consultas IA"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"}];
   const items = role==="admin" ? adminItems : vendedorItems;
   return(
@@ -1865,13 +2147,17 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
         </div>
       </div>
       <div style={{flex:1,padding:"0 10px",overflowY:"auto"}}>
-        {items.map(item=>(
-          <button key={item.id} onClick={()=>setTab(item.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 10px",borderRadius:7,border:"none",background:tab===item.id?"rgba(255,255,255,0.1)":"none",color:tab===item.id?T.white:T.gray600,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:tab===item.id?600:400,marginBottom:2,textAlign:"left",transition:"all .15s"}} onMouseEnter={e=>{if(tab!==item.id){e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color=T.gray300;}}} onMouseLeave={e=>{if(tab!==item.id){e.currentTarget.style.background="none";e.currentTarget.style.color=T.gray600;}}}>
-            <span style={{color:tab===item.id?T.white:T.gray700,flexShrink:0}}>{item.icon}</span>
-            {item.l}
-            {item.badge>0&&<span style={{marginLeft:"auto",background:T.red,color:T.white,borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
-          </button>
-        ))}
+        {items.map((item,i)=>
+          item.divider
+            ? <div key={i} style={{height:1,background:T.gray900,margin:"6px 8px"}}/>
+            : (
+              <button key={item.id} onClick={()=>setTab(item.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 10px",borderRadius:7,border:"none",background:tab===item.id?"rgba(255,255,255,0.1)":"none",color:tab===item.id?T.white:T.gray600,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:tab===item.id?600:400,marginBottom:2,textAlign:"left",transition:"all .15s"}} onMouseEnter={e=>{if(tab!==item.id){e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color=T.gray300;}}} onMouseLeave={e=>{if(tab!==item.id){e.currentTarget.style.background="none";e.currentTarget.style.color=T.gray600;}}}>
+                <span style={{color:tab===item.id?T.white:T.gray700,flexShrink:0}}>{item.icon}</span>
+                {item.l}
+                {item.badge>0&&<span style={{marginLeft:"auto",background:T.red,color:T.white,borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
+              </button>
+            )
+        )}
       </div>
       <div style={{padding:"14px 10px",borderTop:`1px solid ${T.gray900}`}}>
         <button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,border:"none",background:"none",color:T.gray700,cursor:"pointer",fontFamily:"inherit",fontSize:12}} onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color=T.gray400;}} onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.color=T.gray700;}}><IOut/>Cerrar sesión</button>
@@ -1885,7 +2171,7 @@ function Panel({ role, onLogout, kb, setKb }) {
   const [tab,setTab]=useState("chat");
   const [alerts,setAlerts]=useState([]);
   const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(CRM_KEY)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
-  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas",cotizador:"Cotizador de Envíos"};
+  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas",cotizador:"Cotizador de Envíos",usuarios:"Gestión de Usuarios"};
   const desde = role==="admin"?"Administrador":"Vendedor";
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:"Outfit,sans-serif",background:T.gray50}}>
@@ -1905,6 +2191,7 @@ function Panel({ role, onLogout, kb, setKb }) {
           {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView/></div>}
           {tab==="metrics" && <div style={{height:"100%",overflowY:"auto"}}><MetricasView/></div>}
           {tab==="cotizador" && <div style={{height:"100%",overflow:"hidden"}}><CotizadorView/></div>}
+          {tab==="usuarios"  && <UsersView/>}
         </div>
       </div>
     </div>
