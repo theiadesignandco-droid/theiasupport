@@ -293,6 +293,672 @@ const IPDF     = ()       => <Ic d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0
 const IWA = () => <svg width={14} height={14} viewBox="0 0 24 24" fill="#16A34A"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
 const ICRM     = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>;
 const IMetrics = ()       => <Ic d="M18 20V10M12 20V4M6 20v-6"/>;
+const IEnvios  = ()       => <Ic d="M1 3h15v13H1zM16 8l4 2v6h-4M5 16a2 2 0 100 4 2 2 0 000-4zM12 16a2 2 0 100 4 2 2 0 000-4z"/>;
+
+// ─── COTIZADOR VIEW ───────────────────────
+const COT_CSS = `
+.cot-wrap{font-family:'DM Sans',sans-serif;background:#f5f4f0;min-height:100%;display:flex;flex-direction:column;}
+.cot-wrap *{box-sizing:border-box;}
+.cot-subnav{display:flex;gap:2px;flex-wrap:wrap;padding:14px 20px 0;background:#fff;border-bottom:1px solid rgba(0,0,0,0.09);}
+.cot-subnav-section{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#a8a8a3;padding:0 10px 12px;display:flex;align-items:flex-end;}
+.cot-tab{padding:8px 14px 10px;border:none;border-bottom:2px solid transparent;background:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:#737373;cursor:pointer;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
+.cot-tab:hover{color:#1a1a18;}
+.cot-tab.cot-active{color:#c8873a;border-bottom-color:#c8873a;font-weight:600;}
+.cot-body{padding:24px 28px;flex:1;overflow-y:auto;}
+.cot-body .card{background:#fff;border:1px solid rgba(0,0,0,0.09);border-radius:10px;padding:20px 24px;margin-bottom:16px;}
+.cot-body .card-title{font-size:14px;font-weight:600;margin-bottom:14px;color:#1a1a18;}
+.cot-body label.lbl{display:block;font-size:11px;color:#6b6b66;margin-bottom:5px;letter-spacing:.03em;text-transform:uppercase;font-weight:500;}
+.cot-body input[type=text],.cot-body input[type=number],.cot-body input[type=month],.cot-body select,.cot-body textarea{width:100%;background:#f0efe9;border:1px solid rgba(0,0,0,0.09);border-radius:6px;padding:9px 12px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1a1a18;outline:none;transition:border-color .15s;}
+.cot-body input:focus,.cot-body select:focus{border-color:#c8873a;background:#fff;}
+.cot-body .fg{margin-bottom:14px;}
+.cot-body .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.cot-body .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.cot-body .g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+.cot-body .btn{background:#1a1a18;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:opacity .15s;}
+.cot-body .btn:hover{opacity:.82;}
+.cot-body .btn:disabled{opacity:.38;cursor:not-allowed;}
+.cot-body .btn-sm{padding:7px 14px;font-size:12px;}
+.cot-body .btn-accent{background:#c8873a;}
+.cot-body .btn-outline{background:none;color:#1a1a18;border:1px solid rgba(0,0,0,0.15);border-radius:6px;padding:7px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s;}
+.cot-body .btn-outline:hover{background:#f0efe9;}
+.cot-body .btn-ghost{background:none;border:none;cursor:pointer;color:#a8a8a3;font-size:13px;padding:2px 6px;}
+.cot-body .btn-ghost:hover{color:#1a1a18;}
+.cot-body .row-btns{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.cot-body .veh-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.cot-body .veh-card{background:#fff;border:1.5px solid rgba(0,0,0,0.09);border-radius:10px;padding:16px;cursor:pointer;text-align:center;transition:all .2s;}
+.cot-body .veh-card:hover{border-color:rgba(0,0,0,0.15);transform:translateY(-1px);}
+.cot-body .veh-card.sel{border-color:#c8873a;background:#fdf3e8;}
+.cot-body .veh-av{width:44px;height:44px;border-radius:50%;background:#f0efe9;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;margin:0 auto 10px;color:#6b6b66;transition:all .2s;}
+.cot-body .veh-card.sel .veh-av{background:#c8873a;color:#fff;}
+.cot-body .veh-nm{font-size:15px;font-weight:700;margin-bottom:2px;}
+.cot-body .veh-sb{font-size:11px;color:#6b6b66;margin-bottom:8px;}
+.cot-body .veh-rt{font-size:14px;font-weight:500;color:#c8873a;margin-bottom:2px;}
+.cot-body .veh-nt{font-size:11px;color:#a8a8a3;}
+.cot-body .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;}
+.cot-body .metric{background:#f0efe9;border-radius:6px;padding:12px 14px;}
+.cot-body .metric-label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#6b6b66;margin-bottom:4px;font-weight:500;}
+.cot-body .metric-val{font-size:17px;font-weight:500;}
+.cot-body .metric-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.cot-body .bk{background:#f0efe9;border-radius:10px;padding:16px 20px;margin-top:14px;}
+.cot-body .bk-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(0,0,0,0.09);font-size:13px;}
+.cot-body .bk-row:last-of-type{border-bottom:none;}
+.cot-body .bk-total{display:flex;justify-content:space-between;padding-top:12px;margin-top:4px;border-top:2px solid rgba(0,0,0,0.15);}
+.cot-body .bk-total-label{font-weight:600;font-size:14px;}
+.cot-body .bk-price{font-size:32px;font-weight:700;color:#1a1a18;margin-top:6px;}
+.cot-body .bk-rate{font-size:12px;color:#6b6b66;margin-top:3px;}
+.cot-body .ai-box{background:#fff;border:1px solid rgba(0,0,0,0.09);border-radius:10px;padding:18px 22px;margin-bottom:16px;}
+.cot-body .ai-input-row{display:flex;gap:10px;align-items:flex-end;}
+.cot-body .ai-result{background:#f0efe9;border-radius:6px;padding:12px 16px;margin-top:12px;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.cot-body .ai-result.show{display:flex;}
+.cot-body .ai-time-num{font-size:24px;font-weight:700;}
+.cot-body .ai-time-sub{font-size:12px;color:#6b6b66;margin-top:2px;}
+.cot-body .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,0,0,0.15);border-top-color:#c8873a;border-radius:50%;animation:cot-spin .7s linear infinite;}
+@keyframes cot-spin{to{transform:rotate(360deg);}}
+.cot-body .badge{font-size:11px;border-radius:4px;padding:3px 9px;display:inline-block;font-weight:500;}
+.cot-body .b-ok{background:#eaf4ee;color:#2d7a4f;}
+.cot-body .b-warn{background:#fdf3df;color:#926c1a;}
+.cot-body .b-err{background:#fdeaea;color:#b83a3a;}
+.cot-body .b-info{background:#e8f0fc;color:#2a5fa8;}
+.cot-body .tbl-wrap{overflow-x:auto;}
+.cot-body table{width:100%;border-collapse:collapse;}
+.cot-body th{font-size:11px;font-weight:500;color:#6b6b66;text-align:left;padding:6px 8px 9px;border-bottom:1px solid rgba(0,0,0,0.09);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;}
+.cot-body td{padding:9px 8px;border-bottom:1px solid rgba(0,0,0,0.09);font-size:13px;vertical-align:middle;}
+.cot-body tr:last-child td{border-bottom:none;}
+.cot-body .ti{background:none;border:none;outline:none;font-size:13px;font-family:'DM Sans',sans-serif;color:#1a1a18;width:100%;padding:2px 0;}
+.cot-body .ti:focus{border-bottom:1px solid #c8873a;}
+.cot-body .empty-msg{text-align:center;padding:2.5rem 0;color:#a8a8a3;font-size:13px;}
+.cot-body .hint{font-size:12px;color:#6b6b66;line-height:1.65;margin-bottom:14px;}
+.cot-body .warn-inline{background:#fdf3df;color:#926c1a;border-radius:6px;padding:10px 14px;font-size:13px;margin-top:10px;line-height:1.5;}
+.cot-body .dim-row{display:flex;align-items:center;gap:8px;}
+.cot-body .dim-sep{color:#a8a8a3;font-size:17px;font-weight:300;margin-top:20px;}
+.cot-body .no-data{background:#f0efe9;border-radius:6px;padding:14px 16px;font-size:13px;color:#6b6b66;margin-top:12px;}
+.cot-body .sep-line{border:none;border-top:1px solid rgba(0,0,0,0.09);margin:14px 0;}
+.cot-body .ok-msg{font-size:12px;color:#2d7a4f;display:none;}
+.cot-body .damian-min{font-size:30px;font-weight:700;}
+`;
+
+function CotizadorView() {
+  const [cotTab, setCotTab] = useState('amba-calc');
+  const initDone = useRef(false);
+
+  const tabs = [
+    {id:'amba-calc', label:'Calcular flete', group:'Envíos AMBA'},
+    {id:'amba-zonas', label:'Zonas guardadas', group:'Envíos AMBA'},
+    {id:'exp-estimar', label:'Estimar envío', group:'Expressos'},
+    {id:'exp-historial', label:'Cargar cotización', group:'Expressos'},
+    {id:'exp-resumen', label:'Resumen', group:'Expressos'},
+    {id:'exp-config', label:'Configuración', group:'Expressos'},
+  ];
+
+  useEffect(() => {
+    // Inject font and CSS
+    if (!document.getElementById('cot-style')) {
+      const s = document.createElement('style');
+      s.id = 'cot-style';
+      s.textContent = COT_CSS;
+      document.head.appendChild(s);
+    }
+    if (!document.querySelector('link[href*="DM+Sans"]')) {
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap';
+      document.head.appendChild(l);
+    }
+    if (initDone.current) return;
+    initDone.current = true;
+
+    // ── Storage ──
+    window.cotLd = (k,d)=>{try{const v=localStorage.getItem('theia_'+k);return v?JSON.parse(v):d;}catch(e){return d;}};
+    window.cotSv = (k,v)=>{try{localStorage.setItem('theia_'+k,JSON.stringify(v));}catch(e){}};
+    window.cotFmt = (n)=>Math.round(n).toLocaleString('es-AR');
+    window.cotFmtD = (n,d)=>parseFloat(n).toFixed(d!=null?d:1);
+
+    // ── AMBA constants ──
+    window.COT_AR=35000; window.COT_OR=45000; window.COT_LM=30; window.COT_UM=30;
+    window.ambDests=window.cotLd('amb_dests',[]);
+    window.ambVeh=null; window.aiEstimado=null;
+
+    window.selVeh = (v) => {
+      window.ambVeh=v;
+      ['angel','oscar','damian'].forEach(x=>{const el=document.getElementById('vc-'+x);if(el)el.classList.toggle('sel',x===v);});
+      const aoF=document.getElementById('ao-form'), daB=document.getElementById('damian-box');
+      if(v==='damian'){if(aoF)aoF.style.display='none';if(daB)daB.style.display='block';}
+      else{
+        if(aoF)aoF.style.display='block';if(daB)daB.style.display='none';
+        const lbx=document.getElementById('ao-largo-box');if(lbx)lbx.style.display=v==='angel'?'block':'none';
+        window.aoCalc();
+      }
+    };
+
+    window.estimarTiempo = async () => {
+      const destino=(document.getElementById('ao-destino-txt')||{}).value?.trim()||'';
+      if(!destino){alert('Escribí un destino primero.');return;}
+      const btn=document.getElementById('btn-estimar');
+      const resBox=document.getElementById('ai-time-result');
+      const resContent=document.getElementById('ai-time-content');
+      if(btn){btn.disabled=true;btn.textContent='Estimando...';}
+      if(resBox)resBox.className='ai-result show';
+      if(resContent)resContent.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><div class="spinner"></div><span style="font-size:13px;color:#6b6b66;">Consultando a Claude...</span></div>';
+      try{
+        const AK=import.meta.env.VITE_ANTHROPIC_KEY||'';
+        const resp=await fetch('https://api.anthropic.com/v1/messages',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-api-key':AK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:`Sos experto en logística del Gran Buenos Aires. Estimá el tiempo de viaje en camioneta/camión de reparto desde Av. Rodríguez Peña 3919, Quilmes, Buenos Aires hasta "${destino}" (zona AMBA), considerando tráfico normal de día laboral.\n\nRespondé SOLO con JSON válido, sin texto adicional ni markdown:\n{"minutos":ENTERO,"rango":"MIN-MAX min","ruta":"descripción breve de la ruta principal","confianza":"alta|media|baja"}`}]})
+        });
+        const data=await resp.json();
+        const txt=data.content.map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+        const p=JSON.parse(txt);
+        window.aiEstimado=p;
+        const cb=p.confianza==='alta'?'b-ok':p.confianza==='media'?'b-warn':'b-err';
+        const cl={'alta':'Confianza alta','media':'Confianza media','baja':'Confianza baja'}[p.confianza]||'';
+        if(resContent)resContent.innerHTML=`<div><div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;"><span class="ai-time-num">${p.minutos} min</span><span style="font-size:13px;color:#6b6b66;">(${p.rango})</span><span class="badge ${cb}">${cl}</span></div><div class="ai-time-sub">${p.ruta}</div></div>`;
+      }catch(e){
+        if(resContent)resContent.innerHTML='<span style="font-size:13px;color:#b83a3a;">No se pudo estimar. Ingresá el tiempo manualmente.</span>';
+        window.aiEstimado=null;
+      }
+      if(btn){btn.disabled=false;btn.textContent='Estimar tiempo ↗';}
+    };
+
+    window.usarTiempo = () => {
+      if(!window.aiEstimado) return;
+      const t=document.getElementById('ao-tiempo');const h=document.getElementById('ao-tiempo-hint');
+      if(t)t.value=window.aiEstimado.minutos;if(h)h.textContent='estimado por IA · podés ajustarlo';
+      window.aoCalc();
+    };
+
+    window.aoDestSel = () => {
+      const el=document.getElementById('ao-dest-sel');if(!el)return;
+      const id=el.value;if(!id)return;
+      const d=window.ambDests.find(x=>x.id===+id);
+      if(d){
+        const t=document.getElementById('ao-tiempo'),dn=document.getElementById('ao-destino-txt'),h=document.getElementById('ao-tiempo-hint');
+        if(t)t.value=d.minutos;if(dn)dn.value=d.name;if(h)h.textContent='';
+        window.aoCalc();
+      }
+    };
+
+    window.aoCalc = () => {
+      if(!window.ambVeh||window.ambVeh==='damian') return;
+      const t=parseFloat((document.getElementById('ao-tiempo')||{}).value)||0;
+      const lg=window.ambVeh==='angel'?parseFloat((document.getElementById('ao-largo')||{}).value)||0:0;
+      const rEl=document.getElementById('ao-result');const wEl=document.getElementById('ao-largo-warn');
+      if(window.ambVeh==='angel'&&lg>290&&lg>0){if(wEl)wEl.style.display='block';if(rEl)rEl.style.display='none';return;}
+      if(wEl)wEl.style.display='none';if(!t){if(rEl)rEl.style.display='none';return;}
+      const rate=window.ambVeh==='angel'?window.COT_AR:window.COT_OR;
+      const tot=window.COT_LM+t+window.COT_UM;
+      const horas=Math.ceil(tot/60);const cost=horas*rate;
+      const hh=Math.floor(tot/60),mm=tot%60;
+      const tsExacto=hh>0?(mm>0?`${hh}h ${mm}min`:`${hh}h`):`${mm}min`;
+      const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+      set('bk-ida',t+' min');set('bk-total',`${tot} min (${tsExacto})`);
+      set('bk-rate-lbl',`${window.ambVeh==='angel'?'Angel':'Oscar'} · $${window.cotFmt(rate)}/hr`);
+      set('bk-precio','$'+window.cotFmt(cost));
+      set('bk-horas',`${horas} hora${horas>1?'s':''} facturada${horas>1?'s':''} (redondeo para arriba)`);
+      if(rEl)rEl.style.display='block';
+    };
+
+    window.addAmbDest = () => {
+      const n=(document.getElementById('ad-name')||{}).value?.trim();
+      const m=parseFloat((document.getElementById('ad-min')||{}).value)||0;
+      const nt=(document.getElementById('ad-notas')||{}).value?.trim();
+      if(!n||!m){alert('Ingresá nombre y tiempo de viaje.');return;}
+      window.ambDests.push({id:Date.now(),name:n,minutos:m,notas:nt});
+      window.cotSv('amb_dests',window.ambDests);
+      window.renderAmbDestsTable();window.renderAmbDestSel();
+      ['ad-name','ad-min','ad-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    };
+
+    window.delAmbDest = (id) => {
+      window.ambDests=window.ambDests.filter(d=>d.id!==id);
+      window.cotSv('amb_dests',window.ambDests);
+      window.renderAmbDestsTable();window.renderAmbDestSel();
+    };
+
+    window.renderAmbDestSel = () => {
+      const s=document.getElementById('ao-dest-sel');if(!s)return;
+      const v=s.value;
+      s.innerHTML='<option value="">— Seleccioná una zona guardada —</option>';
+      window.ambDests.forEach(d=>s.innerHTML+=`<option value="${d.id}">${d.name} (${d.minutos} min)</option>`);
+      if(v) s.value=v;
+    };
+
+    window.renderAmbDestsTable = () => {
+      const tbl=document.getElementById('ad-table'),emp=document.getElementById('ad-empty');
+      if(!window.ambDests.length){if(tbl)tbl.style.display='none';if(emp)emp.style.display='block';return;}
+      if(emp)emp.style.display='none';if(tbl)tbl.style.display='table';
+      const b=document.getElementById('ad-tbody');if(!b)return;
+      b.innerHTML=window.ambDests.map(d=>{
+        const tot=window.COT_LM+d.minutos+window.COT_UM,h=Math.ceil(tot/60);
+        return`<tr><td style="font-weight:500;">${d.name}</td><td style="text-align:right;">${d.minutos} min</td><td style="text-align:right;">$${window.cotFmt(h*window.COT_AR)}</td><td style="text-align:right;">$${window.cotFmt(h*window.COT_OR)}</td><td style="color:#6b6b66;">${d.notas||'—'}</td><td><button class="btn-ghost" onclick="delAmbDest(${d.id})">✕</button></td></tr>`;
+      }).join('');
+    };
+
+    // ── Expressos ──
+    const FE_DD=[{name:'Córdoba',obs:''},{name:'Neuquén',obs:''},{name:'Bariloche',obs:''},{name:'Mar del Plata',obs:''},{name:'Entre Ríos',obs:''},{name:'Tucumán',obs:''}];
+    window.feDests=window.cotLd('fe_dests',FE_DD.map(d=>({...d})));
+    window.feHist=window.cotLd('fe_hist',[]);
+    window.feCfg=window.cotLd('fe_cfg',{div:6000});
+
+    window.feV=(l,a,h,b,dv)=>(l*a*h*b)/dv;
+    window.feCW=(r,v)=>Math.max(r||0,v||0);
+
+    window.feInitSels = () => {
+      const s=document.getElementById('e-dest');if(!s)return;
+      const v=s.value;
+      s.innerHTML='<option value="">— Seleccioná destino —</option>';
+      window.feDests.forEach((d,i)=>s.innerHTML+=`<option value="${i}">${d.name}</option>`);
+      if(v!=='')s.value=v;
+      const dv=document.getElementById('r-divshow');if(dv)dv.textContent=window.feCfg.div;
+      window.feCalc();
+    };
+
+    window.feCalc = () => {
+      const di=(document.getElementById('e-dest')||{}).value;
+      const b=parseFloat((document.getElementById('e-bultos')||{}).value)||1;
+      const p=parseFloat((document.getElementById('e-peso')||{}).value)||0;
+      const l=parseFloat((document.getElementById('e-l')||{}).value)||0;
+      const a=parseFloat((document.getElementById('e-a')||{}).value)||0;
+      const h2=parseFloat((document.getElementById('e-h')||{}).value)||0;
+      const div=window.feCfg.div;
+      const vol=(l&&a&&h2)?window.feV(l,a,h2,b,div):0;
+      const fact=window.feCW(p,vol);
+      const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+      set('r-real',p?window.cotFmtD(p)+' kg':'—');set('r-vol',vol?window.cotFmtD(vol)+' kg':'—');set('r-fact',fact?window.cotFmtD(fact)+' kg':'—');
+      const rEl=document.getElementById('est-result'),nEl=document.getElementById('est-nodata');
+      if(!di||fact===0){if(rEl)rEl.style.display='none';if(nEl)nEl.style.display='none';return;}
+      const dq=window.feHist.filter(q=>+q.di===+di);
+      if(!dq.length){if(rEl)rEl.style.display='none';if(nEl)nEl.style.display='block';return;}
+      if(nEl)nEl.style.display='none';
+      const stats=dq.map(q=>{const v2=window.feV(q.l,q.a,q.h,q.b,div),cw=window.feCW(q.p,v2);return cw>0?{rate:q.precio/cw,empresa:q.empresa}:null;}).filter(Boolean);
+      if(!stats.length){if(rEl)rEl.style.display='none';if(nEl)nEl.style.display='block';return;}
+      const rates=stats.map(s=>s.rate);
+      const avg=rates.reduce((s,r)=>s+r,0)/rates.length,mn=Math.min(...rates),mx=Math.max(...rates);
+      set('r-precio','$'+window.cotFmt(avg*fact));set('r-rango','Rango: $'+window.cotFmt(mn*fact)+' – $'+window.cotFmt(mx*fact));
+      set('r-nq','Basado en '+stats.length+' cotización'+(stats.length>1?'es':''));
+      set('r-tasa','Tarifa prom.: $'+window.cotFmtD(avg,0)+'/kg facturable');
+      let cl,ct;if(stats.length>=5){cl='b-ok';ct='Confianza alta';}else if(stats.length>=2){cl='b-warn';ct='Confianza media';}else{cl='b-err';ct='Dato único';}
+      const rb=document.getElementById('r-badge');if(rb)rb.innerHTML=`<span class="badge ${cl}">${ct}</span>`;
+      const byEmp={};stats.forEach(s=>{const k=s.empresa||'Sin nombre';if(!byEmp[k])byEmp[k]=[];byEmp[k].push(s.rate);});
+      const empR=Object.entries(byEmp).map(([e,rs])=>{const a2=rs.reduce((s,r)=>s+r,0)/rs.length;return`<span style="font-size:12px;color:#6b6b66;">${e}: <strong style="color:#1a1a18;">$${window.cotFmt(a2*fact)}</strong> (${rs.length} cotiz.)</span>`;}).join('&nbsp;·&nbsp;');
+      const rd=document.getElementById('r-detalle');if(rd)rd.innerHTML=empR?`<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b6b66;margin-bottom:8px;font-weight:500;">Por transportista</div>${empR}`:'';
+      if(rEl)rEl.style.display='block';
+    };
+
+    window.feRenderHSel = () => {
+      const s=document.getElementById('h-dest');if(!s)return;
+      s.innerHTML='<option value="">— Destino —</option>';
+      window.feDests.forEach((d,i)=>s.innerHTML+=`<option value="${i}">${d.name}</option>`);
+    };
+
+    window.addFEHist = () => {
+      const di=(document.getElementById('h-dest')||{}).value;
+      const precio=parseFloat((document.getElementById('h-precio')||{}).value)||0;
+      if(di===''||!precio){alert('Completá al menos destino y precio pagado.');return;}
+      window.feHist.push({
+        id:Date.now(),di:+di,
+        b:parseFloat((document.getElementById('h-b')||{}).value)||1,
+        p:parseFloat((document.getElementById('h-p')||{}).value)||0,
+        precio,
+        l:parseFloat((document.getElementById('h-l')||{}).value)||0,
+        a:parseFloat((document.getElementById('h-a')||{}).value)||0,
+        h:parseFloat((document.getElementById('h-h')||{}).value)||0,
+        fecha:(document.getElementById('h-fecha')||{}).value||'',
+        empresa:((document.getElementById('h-emp')||{}).value||'').trim(),
+        notas:((document.getElementById('h-notas')||{}).value||'').trim(),
+      });
+      window.cotSv('fe_hist',window.feHist);window.feRenderHTable();
+      ['h-b','h-p','h-precio','h-l','h-a','h-h','h-notas','h-emp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='h-b'?1:'';});
+      const ok=document.getElementById('h-ok');if(ok){ok.style.display='inline';setTimeout(()=>ok.style.display='none',2500);}
+    };
+
+    window.delFEHist = (id) => {window.feHist=window.feHist.filter(q=>q.id!==id);window.cotSv('fe_hist',window.feHist);window.feRenderHTable();};
+
+    window.feRenderHTable = () => {
+      const tbl=document.getElementById('hl-table'),emp=document.getElementById('hl-empty');
+      if(!window.feHist.length){if(tbl)tbl.style.display='none';if(emp)emp.style.display='block';return;}
+      if(emp)emp.style.display='none';if(tbl)tbl.style.display='table';
+      const b=document.getElementById('hl-body');if(!b)return;
+      b.innerHTML=[...window.feHist].reverse().map(q=>{
+        const dn=window.feDests[q.di]?window.feDests[q.di].name:'—';
+        const vol=window.feV(q.l,q.a,q.h,q.b,window.feCfg.div);
+        const cw=window.feCW(q.p,vol);
+        const dims=(q.l&&q.a&&q.h)?`${q.l}×${q.a}×${q.h}`:'—';
+        return`<tr><td style="font-weight:500;">${dn}</td><td>${q.fecha?q.fecha.substring(0,7):'—'}</td><td>${q.empresa||'—'}</td><td style="text-align:center;">${q.b}</td><td>${dims}</td><td style="text-align:right;">${q.p?q.p+' kg':'—'}</td><td style="text-align:right;color:#6b6b66;">${vol?window.cotFmtD(vol)+' kg':'—'}</td><td style="text-align:right;font-weight:500;">${cw?window.cotFmtD(cw)+' kg':'—'}</td><td style="text-align:right;">$${window.cotFmt(q.precio)}</td><td style="text-align:right;color:#6b6b66;">${cw>0?'$'+window.cotFmtD(q.precio/cw,0):'—'}</td><td><button class="btn-ghost" onclick="delFEHist(${q.id})">✕</button></td></tr>`;
+      }).join('');
+    };
+
+    window.feRenderResumen = () => {
+      const emp=document.getElementById('res-empty'),cards=document.getElementById('res-cards');
+      if(!window.feHist.length){if(emp)emp.style.display='block';if(cards)cards.innerHTML='';return;}
+      if(emp)emp.style.display='none';
+      const byD={};window.feHist.forEach(q=>{if(!byD[q.di])byD[q.di]=[];byD[q.di].push(q);});
+      if(cards)cards.innerHTML=Object.entries(byD).map(([di,qs])=>{
+        const dn=window.feDests[+di]?window.feDests[+di].name:'—';
+        const stats=qs.map(q=>{const v=window.feV(q.l,q.a,q.h,q.b,window.feCfg.div),cw=window.feCW(q.p,v);return cw>0?{rate:q.precio/cw,empresa:q.empresa}:null;}).filter(Boolean);
+        if(!stats.length)return'';
+        const rs=stats.map(s=>s.rate),avg=rs.reduce((s,r)=>s+r,0)/rs.length,mn=Math.min(...rs),mx=Math.max(...rs);
+        const byEmp={};stats.forEach(s=>{const k=s.empresa||'Sin nombre';if(!byEmp[k])byEmp[k]=[];byEmp[k].push(s.rate);});
+        const empR=Object.entries(byEmp).map(([e,rr])=>{const a2=rr.reduce((s,r)=>s+r,0)/rr.length;return`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(0,0,0,0.09);font-size:13px;"><span>${e}</span><span>$${window.cotFmtD(a2,0)}/kg · ${rr.length} cotiz.</span></div>`;}).join('');
+        let cl='b-err';if(qs.length>=5)cl='b-ok';else if(qs.length>=2)cl='b-warn';
+        return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><div style="font-size:16px;font-weight:700;">${dn}</div><span class="badge ${cl}">${qs.length} cotización${qs.length>1?'es':''}</span></div><div class="metrics metric-3" style="margin-bottom:14px;"><div class="metric"><div class="metric-label">Promedio</div><div class="metric-val">$${window.cotFmtD(avg,0)}/kg</div></div><div class="metric"><div class="metric-label">Mínimo</div><div class="metric-val">$${window.cotFmtD(mn,0)}/kg</div></div><div class="metric"><div class="metric-label">Máximo</div><div class="metric-val">$${window.cotFmtD(mx,0)}/kg</div></div></div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b6b66;margin-bottom:6px;font-weight:500;">Por transportista</div>${empR}</div>`;
+      }).join('');
+    };
+
+    window.saveCfg = () => {
+      window.feCfg.div=parseFloat((document.getElementById('cfg-div')||{}).value)||6000;
+      window.cotSv('fe_cfg',window.feCfg);
+      const dv=document.getElementById('r-divshow');if(dv)dv.textContent=window.feCfg.div;
+      const ok=document.getElementById('cfg-ok');if(ok){ok.style.display='inline';setTimeout(()=>ok.style.display='none',2000);}
+      window.feCalc();
+    };
+
+    window.addFEDest = () => {
+      const n=((document.getElementById('nd-name')||{}).value||'').trim();if(!n)return;
+      window.feDests.push({name:n,obs:''});
+      window.cotSv('fe_dests',window.feDests);window.feRenderDestTable();
+      const el=document.getElementById('nd-name');if(el)el.value='';
+    };
+    window.delFEDest = (i) => {
+      window.feHist=window.feHist.filter(q=>+q.di!==i);
+      window.feHist.forEach(q=>{if(+q.di>i)q.di=q.di-1;});
+      window.feDests.splice(i,1);
+      window.cotSv('fe_dests',window.feDests);window.cotSv('fe_hist',window.feHist);window.feRenderDestTable();
+    };
+    window.feRenderDestTable = () => {
+      const b=document.getElementById('dest-tbody');if(!b)return;
+      b.innerHTML=window.feDests.map((d,i)=>`<tr><td style="font-weight:500;">${d.name}</td><td><input class="ti feO" type="text" value="${d.obs||''}" placeholder="Observaciones..."/></td><td><button class="btn-ghost" onclick="delFEDest(${i})">✕</button></td></tr>`).join('');
+    };
+    window.saveFEDests = () => {
+      document.querySelectorAll('.feO').forEach((inp,i)=>{window.feDests[i].obs=inp.value.trim();});
+      window.cotSv('fe_dests',window.feDests);
+      const ok=document.getElementById('d-ok');if(ok){ok.style.display='inline';setTimeout(()=>ok.style.display='none',2000);}
+    };
+
+    // Init on mount
+    setTimeout(()=>{
+      window.renderAmbDestSel();
+      window.feInitSels();
+      const hf=document.getElementById('h-fecha');
+      if(hf){const now=new Date();hf.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;}
+      const cd=document.getElementById('cfg-div');if(cd)cd.value=window.feCfg.div;
+    }, 50);
+
+    return () => {};
+  }, []);
+
+  // On tab change, re-init relevant data
+  useEffect(()=>{
+    setTimeout(()=>{
+      if(cotTab==='amba-zonas') window.renderAmbDestsTable?.();
+      if(cotTab==='exp-historial'){window.feRenderHSel?.();window.feRenderHTable?.();}
+      if(cotTab==='exp-resumen') window.feRenderResumen?.();
+      if(cotTab==='exp-config'){const cd=document.getElementById('cfg-div');if(cd)cd.value=window.feCfg?.div||6000;window.feRenderDestTable?.();}
+      if(cotTab==='exp-estimar') window.feInitSels?.();
+    },30);
+  },[cotTab]);
+
+  const groups = [...new Set(tabs.map(t=>t.group))];
+
+  return (
+    <div className="cot-wrap" style={{height:'100%',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      {/* Sub-nav */}
+      <div className="cot-subnav">
+        {groups.map(g=>(
+          <React.Fragment key={g}>
+            <div className="cot-subnav-section">{g}</div>
+            {tabs.filter(t=>t.group===g).map(t=>(
+              <button key={t.id} className={`cot-tab${cotTab===t.id?' cot-active':''}`} onClick={()=>setCotTab(t.id)}>{t.label}</button>
+            ))}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div className="cot-body" style={{overflowY:'auto',flex:1}}>
+
+        {/* AMBA CALC */}
+        {cotTab==='amba-calc' && (
+          <div>
+            <div className="veh-grid">
+              {[{id:'angel',nm:'Angel',sb:'Carga chica',rt:'$35.000/hr',nt:'Largo < 290 cm'},{id:'oscar',nm:'Oscar',sb:'Carga mediana',rt:'$45.000/hr',nt:'Cargas medianas'},{id:'damian',nm:'Damián',sb:'Carga grande',rt:'A cotizar',nt:'Mínimo $200.000'}].map(v=>(
+                <div key={v.id} className="veh-card" id={`vc-${v.id}`} onClick={()=>window.selVeh(v.id)}>
+                  <div className="veh-av">{v.nm[0]}</div>
+                  <div className="veh-nm">{v.nm}</div>
+                  <div className="veh-sb">{v.sb}</div>
+                  <div className="veh-rt">{v.rt}</div>
+                  <div className="veh-nt">{v.nt}</div>
+                </div>
+              ))}
+            </div>
+            <div id="ao-form" style={{display:'none'}}>
+              <div className="ai-box">
+                <div className="card-title">Destino</div>
+                <div className="fg">
+                  <label className="lbl">Zona guardada (acceso rápido)</label>
+                  <select id="ao-dest-sel" onChange={()=>window.aoDestSel()} style={{width:'100%'}}>
+                    <option value="">— Seleccioná una zona guardada —</option>
+                  </select>
+                </div>
+                <label className="lbl">O escribí la dirección / zona</label>
+                <div className="ai-input-row">
+                  <input type="text" id="ao-destino-txt" placeholder="Ej: Palermo CABA · San Isidro · Av. Santa Fe 2000" style={{flex:1}} onKeyDown={e=>{if(e.key==='Enter')window.estimarTiempo();}}/>
+                  <button className="btn btn-accent btn-sm" id="btn-estimar" onClick={()=>window.estimarTiempo()}>Estimar tiempo ↗</button>
+                </div>
+                <div className="ai-result" id="ai-time-result">
+                  <div id="ai-time-content"></div>
+                  <button className="btn-outline" onClick={()=>window.usarTiempo()}>Usar este tiempo</button>
+                </div>
+              </div>
+              <div className="card">
+                <div id="ao-largo-box" style={{display:'none'}} className="fg">
+                  <label className="lbl">Largo del envío (cm)</label>
+                  <input type="number" id="ao-largo" min="0" placeholder="Ej: 180" onInput={()=>window.aoCalc()} style={{width:180}}/>
+                  <div id="ao-largo-warn" className="warn-inline" style={{display:'none'}}>Este envío supera 290 cm — Angel no puede llevarlo. Usá Oscar o Damián.</div>
+                </div>
+                <div className="fg">
+                  <label className="lbl">Tiempo de viaje ida (minutos)</label>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <input type="number" id="ao-tiempo" min="0" placeholder="Ej: 45" onInput={()=>window.aoCalc()} style={{width:150}}/>
+                    <span style={{fontSize:12,color:'#6b6b66'}} id="ao-tiempo-hint"></span>
+                  </div>
+                </div>
+                <div id="ao-result" style={{display:'none'}}>
+                  <hr className="sep-line"/>
+                  <div className="bk">
+                    <div className="bk-row"><span>Carga</span><span>30 min</span></div>
+                    <div className="bk-row"><span>Viaje ida</span><span id="bk-ida">—</span></div>
+                    <div className="bk-row"><span>Descarga</span><span>30 min</span></div>
+                    <div className="bk-total">
+                      <span className="bk-total-label">Total</span>
+                      <span id="bk-total" style={{fontWeight:600,fontSize:14}}></span>
+                    </div>
+                  </div>
+                  <div style={{marginTop:14}}>
+                    <div className="bk-rate" id="bk-rate-lbl"></div>
+                    <div className="bk-price" id="bk-precio"></div>
+                    <div style={{fontSize:12,color:'#6b6b66',marginTop:4}} id="bk-horas"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="damian-box" style={{display:'none'}} className="card">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                <div className="card-title" style={{margin:0}}>Damián — Carga grande</div>
+                <span className="badge b-warn">A cotizar</span>
+              </div>
+              <div style={{display:'inline-block',background:'#f0efe9',borderRadius:6,padding:'14px 20px',marginBottom:14}}>
+                <div className="metric-label">Precio mínimo</div>
+                <div className="damian-min">$200.000</div>
+              </div>
+              <p style={{fontSize:13,color:'#6b6b66',lineHeight:1.65}}>El precio final depende de la distancia y características de la carga. Confirmá la cotización antes de comprometerte con el cliente.</p>
+            </div>
+          </div>
+        )}
+
+        {/* AMBA ZONAS */}
+        {cotTab==='amba-zonas' && (
+          <div>
+            <div className="card">
+              <div className="card-title">Agregar zona frecuente</div>
+              <p className="hint">Las zonas guardadas aparecen como acceso rápido en el calculador para agilizar las cotizaciones.</p>
+              <div className="g3">
+                <div><label className="lbl">Zona / Destino</label><input type="text" id="ad-name" placeholder="Ej: Palermo"/></div>
+                <div><label className="lbl">Tiempo ida (min)</label><input type="number" id="ad-min" min="1" placeholder="Ej: 40"/></div>
+                <div><label className="lbl">Notas</label><input type="text" id="ad-notas" placeholder="Zona norte, peaje..."/></div>
+              </div>
+              <button className="btn btn-sm" onClick={()=>window.addAmbDest()}>+ Guardar zona</button>
+            </div>
+            <div className="card">
+              <div className="card-title">Zonas guardadas</div>
+              <div id="ad-empty" className="empty-msg">Todavía no guardaste zonas. Agregá las frecuentes para agilizar la cotización.</div>
+              <div className="tbl-wrap">
+                <table id="ad-table" style={{display:'none',minWidth:580}}>
+                  <thead><tr><th>Zona</th><th style={{textAlign:'right'}}>T. ida</th><th style={{textAlign:'right'}}>Angel (1 hr)</th><th style={{textAlign:'right'}}>Oscar (1 hr)</th><th>Notas</th><th style={{width:36}}></th></tr></thead>
+                  <tbody id="ad-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EXP ESTIMAR */}
+        {cotTab==='exp-estimar' && (
+          <div>
+            <div className="card">
+              <div className="card-title">Datos del envío</div>
+              <div className="fg">
+                <label className="lbl">Destino</label>
+                <select id="e-dest" onChange={()=>window.feCalc()} style={{width:'100%',maxWidth:360}}></select>
+              </div>
+              <div className="g2" style={{maxWidth:360}}>
+                <div><label className="lbl">Cantidad de bultos</label><input type="number" id="e-bultos" min="1" defaultValue="1" onInput={()=>window.feCalc()}/></div>
+                <div><label className="lbl">Peso total real (kg)</label><input type="number" id="e-peso" min="0" step="0.1" placeholder="0" onInput={()=>window.feCalc()}/></div>
+              </div>
+              <div className="fg">
+                <label className="lbl">Medidas por bulto (cm)</label>
+                <div className="dim-row" style={{maxWidth:360}}>
+                  <div style={{flex:1}}><label className="lbl">Largo</label><input type="number" id="e-l" placeholder="—" onInput={()=>window.feCalc()}/></div>
+                  <span className="dim-sep">×</span>
+                  <div style={{flex:1}}><label className="lbl">Ancho</label><input type="number" id="e-a" placeholder="—" onInput={()=>window.feCalc()}/></div>
+                  <span className="dim-sep">×</span>
+                  <div style={{flex:1}}><label className="lbl">Alto</label><input type="number" id="e-h" placeholder="—" onInput={()=>window.feCalc()}/></div>
+                </div>
+              </div>
+            </div>
+            <div className="metrics">
+              <div className="metric"><div className="metric-label">Peso real</div><div className="metric-val" id="r-real">—</div></div>
+              <div className="metric"><div className="metric-label">Peso volumétrico</div><div className="metric-val" id="r-vol">—</div></div>
+              <div className="metric"><div className="metric-label">Peso facturable</div><div className="metric-val" id="r-fact">—</div></div>
+              <div className="metric"><div className="metric-label">Divisor vol.</div><div className="metric-val" id="r-divshow">6000</div></div>
+            </div>
+            <div id="est-nodata" style={{display:'none'}} className="no-data">Sin cotizaciones históricas para este destino. Cargalas en <strong>Cargar cotización</strong>.</div>
+            <div id="est-result" style={{display:'none'}} className="card">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
+                <div>
+                  <div style={{fontSize:12,color:'#6b6b66',marginBottom:2}}>Precio estimado</div>
+                  <div style={{fontSize:36,fontWeight:700}} id="r-precio">$0</div>
+                  <div style={{fontSize:13,color:'#6b6b66'}} id="r-rango"></div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div id="r-badge"></div>
+                  <div style={{fontSize:12,color:'#6b6b66',marginTop:8}} id="r-nq"></div>
+                  <div style={{fontSize:12,color:'#6b6b66',marginTop:2}} id="r-tasa"></div>
+                </div>
+              </div>
+              <hr className="sep-line"/>
+              <div id="r-detalle"></div>
+            </div>
+          </div>
+        )}
+
+        {/* EXP HISTORIAL */}
+        {cotTab==='exp-historial' && (
+          <div>
+            <div className="card">
+              <div className="card-title">Registrar cotización real</div>
+              <p className="hint">Cargá cada cotización que te da la empresa de transporte. Con más datos, la estimación es más precisa.</p>
+              <div className="g2">
+                <div><label className="lbl">Destino</label><select id="h-dest" style={{width:'100%'}}></select></div>
+                <div><label className="lbl">Mes / Año</label><input type="month" id="h-fecha"/></div>
+              </div>
+              <div className="g4">
+                <div><label className="lbl">Bultos</label><input type="number" id="h-b" min="1" defaultValue="1"/></div>
+                <div><label className="lbl">Peso real (kg)</label><input type="number" id="h-p" min="0" step="0.1" placeholder="0"/></div>
+                <div><label className="lbl">Precio pagado ($)</label><input type="number" id="h-precio" min="0" placeholder="0"/></div>
+                <div><label className="lbl">Transportista</label><input type="text" id="h-emp" placeholder="Ej: OCA"/></div>
+              </div>
+              <div className="fg">
+                <label className="lbl">Medidas por bulto (cm)</label>
+                <div className="dim-row" style={{maxWidth:380}}>
+                  <div style={{flex:1}}><label className="lbl">Largo</label><input type="number" id="h-l" placeholder="—"/></div>
+                  <span className="dim-sep">×</span>
+                  <div style={{flex:1}}><label className="lbl">Ancho</label><input type="number" id="h-a" placeholder="—"/></div>
+                  <span className="dim-sep">×</span>
+                  <div style={{flex:1}}><label className="lbl">Alto</label><input type="number" id="h-h" placeholder="—"/></div>
+                </div>
+              </div>
+              <div className="fg"><label className="lbl">Notas (opcional)</label><input type="text" id="h-notas" placeholder="Observaciones adicionales"/></div>
+              <div className="row-btns">
+                <button className="btn btn-sm" onClick={()=>window.addFEHist()}>Guardar cotización</button>
+                <span className="ok-msg" id="h-ok">✓ Guardado</span>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-title">Cotizaciones cargadas</div>
+              <div id="hl-empty" className="empty-msg">Todavía no cargaste cotizaciones.</div>
+              <div className="tbl-wrap">
+                <table id="hl-table" style={{display:'none',minWidth:680}}>
+                  <thead><tr><th>Destino</th><th>Mes</th><th>Trans.</th><th style={{textAlign:'center'}}>Bultos</th><th>Medidas</th><th style={{textAlign:'right'}}>P.real</th><th style={{textAlign:'right'}}>P.vol.</th><th style={{textAlign:'right'}}>P.fact.</th><th style={{textAlign:'right'}}>Precio</th><th style={{textAlign:'right'}}>$/kg</th><th></th></tr></thead>
+                  <tbody id="hl-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EXP RESUMEN */}
+        {cotTab==='exp-resumen' && (
+          <div>
+            <div id="res-empty" className="card"><div className="empty-msg">Sin cotizaciones cargadas todavía.</div></div>
+            <div id="res-cards"></div>
+          </div>
+        )}
+
+        {/* EXP CONFIG */}
+        {cotTab==='exp-config' && (
+          <div>
+            <div className="card">
+              <div className="card-title">Divisor de peso volumétrico</div>
+              <p className="hint">El divisor varía por transportista. Los más comunes son 6000 (estándar), 5000 o 4000. Consultá con tu empresa cuál usan.</p>
+              <div style={{display:'flex',alignItems:'flex-end',gap:12}}>
+                <div><label className="lbl">Divisor</label><input type="number" id="cfg-div" defaultValue="6000" min="1000" style={{width:110}}/></div>
+                <button className="btn btn-sm" onClick={()=>window.saveCfg()}>Guardar</button>
+                <span className="ok-msg" id="cfg-ok">✓ Guardado</span>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-title">Destinos expressos</div>
+              <div style={{display:'flex',gap:10,marginBottom:14}}>
+                <input type="text" id="nd-name" placeholder="Agregar destino (ej: Rosario)" style={{flex:1,maxWidth:300}}/>
+                <button className="btn btn-sm" onClick={()=>window.addFEDest()}>+ Agregar</button>
+              </div>
+              <table>
+                <thead><tr><th>Destino</th><th>Observaciones</th><th style={{width:36}}></th></tr></thead>
+                <tbody id="dest-tbody"></tbody>
+              </table>
+              <div style={{marginTop:14,display:'flex',gap:10,alignItems:'center'}}>
+                <button className="btn btn-sm" onClick={()=>window.saveFEDests()}>Guardar cambios</button>
+                <span className="ok-msg" id="d-ok">✓ Guardado</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
 
 // ─── BUBBLE ───────────────────────────────
 function Bubble({ msg, isAdmin, onCorrect }) {
@@ -1186,7 +1852,7 @@ function MetricasView() {
 
 // ─── SIDEBAR ──────────────────────────────
 function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
-  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount},{id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},{id:"metrics",icon:<IMetrics/>,l:"Métricas"}];
+  const adminItems = [{id:"chat",icon:<IChat/>,l:"Chat + Corrección"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"},{id:"kb",icon:<IKB/>,l:"Conocimiento"},{id:"train",icon:<IBrain/>,l:"Entrenar IA"},{id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount},{id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},{id:"metrics",icon:<IMetrics/>,l:"Métricas"},{id:"cotizador",icon:<IEnvios/>,l:"Cotizador Envíos"}];
   const vendedorItems = [{id:"chat",icon:<IChat/>,l:"Consultas IA"},{id:"calc",icon:<ICalc/>,l:"Calculadora"},{id:"catalog",icon:<ICatalog/>,l:"Catálogo"}];
   const items = role==="admin" ? adminItems : vendedorItems;
   return(
@@ -1220,7 +1886,7 @@ function Panel({ role, onLogout, kb, setKb }) {
   const [tab,setTab]=useState("chat");
   const [alerts,setAlerts]=useState([]);
   const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(CRM_KEY)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
-  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas"};
+  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas",cotizador:"Cotizador de Envíos"};
   const desde = role==="admin"?"Administrador":"Vendedor";
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:"Outfit,sans-serif",background:T.gray50}}>
@@ -1239,6 +1905,7 @@ function Panel({ role, onLogout, kb, setKb }) {
           {tab==="alerts"  && <AlertsView alerts={alerts} setAlerts={setAlerts} setKb={setKb}/>}
           {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView/></div>}
           {tab==="metrics" && <div style={{height:"100%",overflowY:"auto"}}><MetricasView/></div>}
+          {tab==="cotizador" && <div style={{height:"100%",overflow:"hidden"}}><CotizadorView/></div>}
         </div>
       </div>
     </div>
