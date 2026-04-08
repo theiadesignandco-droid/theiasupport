@@ -299,6 +299,9 @@ const ICRM     = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11
 const IMetrics = ()       => <Ic d="M18 20V10M12 20V4M6 20v-6"/>;
 const IEnvios  = ()       => <Ic d="M1 3h15v13H1zM16 8l4 2v6h-4M5 16a2 2 0 100 4 2 2 0 000-4zM12 16a2 2 0 100 4 2 2 0 000-4z"/>;
 const IUsers   = ()       => <Ic d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>;
+const IDash    = ()       => <Ic d="M3 3h7v7H3zM13 3h8v7h-8zM13 13h8v8h-8zM3 13h7v8H3z"/>;
+const ITask    = ()       => <Ic d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>;
+const ITareas  = ()       => <Ic d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>;
 
 // ─── USUARIOS VIEW ────────────────────────
 function UsersView() {
@@ -440,6 +443,156 @@ function UsersView() {
     </div>
   );
 }
+
+// ─── SHARED TASK CONSTANTS ─────────────────
+// CAT_TAREAS/CAT_COLORS are display helpers used in Dashboard.
+// TareasView uses TIPO_CFG (defined near TAREAS_KEY) as the authoritative source.
+const CAT_TAREAS = {despacho:"📦 Despacho",compras:"🛒 Compras",reunion:"🤝 Reunión",entrega_muestras:"🎨 Muestras",llamada:"📞 Llamada",otro:"📌 Otro"};
+const CAT_COLORS  = {despacho:"#5c9be0",compras:"#e09b3d",reunion:"#9b5ce0",entrega_muestras:"#4caf7d",llamada:"#e05c5c",otro:"#999"};
+const TAREA_EST   = {pendiente:"Pendiente",en_progreso:"En progreso",completado:"Completado"};
+
+// ─── DASHBOARD VIEW ───────────────────────
+function DashboardView({ username, role }) {
+  const clients = lsGet(CRM_KEY,[]);
+  const tareas  = lsGet(TAREAS_KEY,[]);
+  const hoy     = todayStr();
+
+  const urgentes  = clients.filter(c=>reminderLv(c)==="urgente");
+  const warning   = clients.filter(c=>reminderLv(c)==="warning");
+  const cerrados  = clients.filter(c=>c.estado==="cerrado");
+  const tareasHoy = tareas.filter(t=>t.fecha===hoy&&t.estado!=="completado");
+  const vencidas  = tareas.filter(t=>t.fecha<hoy&&t.estado!=="completado");
+  const misTareas = tareas.filter(t=>t.asignado===username&&t.estado!=="completado");
+  const allUsers  = getEffectiveUsers();
+
+  const S = (val,col,lbl,sub) => (
+    <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:"16px 18px"}}>
+      <div style={{fontSize:10,color:T.gray400,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{lbl}</div>
+      <div style={{fontSize:28,fontWeight:800,color:col,lineHeight:1}}>{val}</div>
+      <div style={{fontSize:11,color:T.gray400,marginTop:3}}>{sub}</div>
+    </div>
+  );
+
+  return (
+    <div style={{padding:24,overflowY:"auto",height:"100%",background:T.gray50}}>
+      {/* Header */}
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:22,fontWeight:800,color:T.black}}>Bienvenido, {allUsers[username]?.label||username} 👋</div>
+        <div style={{fontSize:13,color:T.gray500,marginTop:3}}>{new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:24}}>
+        {S(urgentes.length,"#DC2626","🔴 CRM urgentes","7+ días sin contacto")}
+        {S(warning.length,"#D97706","🟡 CRM pendientes","5-6 días sin contacto")}
+        {S(tareasHoy.length,"#2563EB","📅 Tareas hoy","para completar")}
+        {S(vencidas.length,vencidas.length>0?"#DC2626":T.green,"⚠ Tareas vencidas","sin completar")}
+        {S(cerrados.length,"#16A34A","✓ Clientes cerrados","total histórico")}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        {/* CRM urgentes */}
+        <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:18}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:T.black,display:"flex",alignItems:"center",gap:8}}>
+            🔴 Clientes que necesitan contacto
+            <span style={{background:"#FEF2F2",color:"#DC2626",borderRadius:5,padding:"2px 7px",fontSize:11,fontWeight:600}}>{urgentes.length+warning.length}</span>
+          </div>
+          {urgentes.length===0&&warning.length===0
+            ? <div style={{color:T.gray400,fontSize:13,padding:"16px 0",textAlign:"center"}}>✓ Todo al día</div>
+            : [...urgentes,...warning].slice(0,6).map(c=>{
+                const d=daysSince(c.fechaContacto);
+                const urg=reminderLv(c)==="urgente";
+                return(
+                  <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${T.gray100}`}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:T.black}}>{c.nombre}</div>
+                      <div style={{fontSize:11,color:T.gray400}}>{ESTADO_LABELS[c.estado]} {c.asignado?`· ${allUsers[c.asignado]?.label||c.asignado}`:""}</div>
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,color:urg?"#DC2626":"#D97706",background:urg?"#FEF2F2":"#FFFBEB",borderRadius:5,padding:"2px 7px",flexShrink:0}}>{d}d</span>
+                  </div>
+                );
+              })
+          }
+        </div>
+
+        {/* Mis tareas / Tareas hoy */}
+        <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:18}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:T.black,display:"flex",alignItems:"center",gap:8}}>
+            📅 Mis tareas pendientes
+            <span style={{background:"#EFF6FF",color:"#2563EB",borderRadius:5,padding:"2px 7px",fontSize:11,fontWeight:600}}>{misTareas.length}</span>
+          </div>
+          {misTareas.length===0
+            ? <div style={{color:T.gray400,fontSize:13,padding:"16px 0",textAlign:"center"}}>Sin tareas asignadas</div>
+            : misTareas.sort((a,b)=>(a.fecha||"")>(b.fecha||"")? 1:-1).slice(0,6).map(t=>{
+                const venc = t.fecha && t.fecha<hoy;
+                return(
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.gray100}`}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{CAT_TAREAS[t.categoria]?.split(" ")[0]||"📌"}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:T.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.titulo}</div>
+                      <div style={{fontSize:11,color:venc?"#DC2626":T.gray400}}>{t.fecha?fmtDate(t.fecha):"Sin fecha"}{t.hora?` · ${t.hora}`:""}</div>
+                    </div>
+                    <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:t.estado==="en_curso"?"#EFF6FF":"#F9FAFB",color:t.estado==="en_curso"?"#2563EB":T.gray500,flexShrink:0}}>{TAREA_EST[t.estado]}</span>
+                  </div>
+                );
+              })
+          }
+        </div>
+
+        {/* Próximos eventos (todas las tareas con fecha) */}
+        <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:18}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:T.black}}>🗓 Próximos eventos del equipo</div>
+          {tareas.filter(t=>t.fecha>=hoy&&t.estado!=="completado").sort((a,b)=>a.fecha>b.fecha?1:-1).slice(0,6).length===0
+            ? <div style={{color:T.gray400,fontSize:13,padding:"16px 0",textAlign:"center"}}>Sin eventos próximos</div>
+            : tareas.filter(t=>t.fecha>=hoy&&t.estado!=="completado").sort((a,b)=>a.fecha>b.fecha?1:-1).slice(0,6).map(t=>{
+                const col = CAT_COLORS[t.categoria]||"#999";
+                return(
+                  <div key={t.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${T.gray100}`}}>
+                    <div style={{width:3,height:36,background:col,borderRadius:2,flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:T.black,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.titulo}</div>
+                      <div style={{fontSize:11,color:T.gray400}}>{fmtDate(t.fecha)}{t.hora?` · ${t.hora}`:""} · {allUsers[t.asignado]?.label||"Sin asignar"}</div>
+                    </div>
+                    <span style={{fontSize:10,color:col,fontWeight:700,background:col+"20",borderRadius:4,padding:"2px 6px",flexShrink:0}}>{CAT_TAREAS[t.categoria]?.split(" ")[1]||"Otro"}</span>
+                  </div>
+                );
+              })
+          }
+        </div>
+
+        {/* Resumen CRM por responsable */}
+        <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:18}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:T.black}}>👥 CRM por responsable</div>
+          {Object.entries(allUsers).map(([u,d])=>{
+            const total = clients.filter(c=>c.asignado===u);
+            const urg   = total.filter(c=>reminderLv(c)==="urgente").length;
+            if(!total.length) return null;
+            return(
+              <div key={u} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.gray100}`}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:T.gray100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.gray600,flexShrink:0}}>{d.label[0]}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.black}}>{d.label}</div>
+                  <div style={{fontSize:11,color:T.gray400}}>{total.length} clientes · {total.filter(c=>c.estado==="cerrado").length} cerrados</div>
+                </div>
+                {urg>0&&<span style={{background:"#FEF2F2",color:"#DC2626",borderRadius:5,padding:"2px 7px",fontSize:11,fontWeight:700}}>🔴 {urg}</span>}
+              </div>
+            );
+          })}
+          {clients.filter(c=>!c.asignado).length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0"}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:T.gray100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.gray400,flexShrink:0}}>?</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:T.gray500}}>Sin asignar</div>
+                <div style={{fontSize:11,color:T.gray400}}>{clients.filter(c=>!c.asignado).length} clientes</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── SIDEBAR ──────────────────────────────
 const COT_CSS = `
@@ -1712,6 +1865,311 @@ function AlertsView({ alerts, setAlerts, setKb }) {
   );
 }
 
+// ─── TAREAS & EVENTOS ─────────────────────
+const TAREAS_KEY = "theia_tareas_v1";
+
+const TIPO_CFG = {
+  despacho:         {label:"Despacho",       color:"#5c9be0", bg:"#5c9be020", icon:"📦"},
+  compras:          {label:"Compras",         color:"#e09b3d", bg:"#e09b3d20", icon:"🛒"},
+  reunion:          {label:"Reunión",          color:"#9b5ce0", bg:"#9b5ce020", icon:"🤝"},
+  entrega_muestras: {label:"Entrega muestras",color:"#4caf7d", bg:"#4caf7d20", icon:"🎁"},
+  llamada:          {label:"Llamada",          color:"#e05c5c", bg:"#e05c5c20", icon:"📞"},
+  otro:             {label:"Otro",             color:"#999",    bg:"#99999920", icon:"📌"},
+};
+const CALENDARS = {
+  ventas: {label:"theiadesignventas@gmail.com", short:"Ventas", color:"#5c9be0"},
+  andco:  {label:"theiadesignandco@gmail.com",  short:"Theia & Co", color:"#9b5ce0"},
+};
+const gcalLink = (t) => {
+  const cal = CALENDARS[t.calendario]?.label || CALENDARS.andco.label;
+  const d = t.fecha?.replace(/-/g,"") || "";
+  const h = t.hora?.replace(":","")+"00" || "";
+  const dur = parseInt(t.duracion)||60;
+  const endH = t.hora ? (() => {
+    const [hh,mm] = t.hora.split(":").map(Number);
+    const total = hh*60+mm+dur;
+    return `${String(Math.floor(total/60)).padStart(2,"0")}${String(total%60).padStart(2,"0")}00`;
+  })() : h;
+  const dates = d&&h ? `${d}T${h}/${d}T${endH}` : d ? `${d}/${d}` : "";
+  const assigneeLabel = t.asignado ? (getEffectiveUsers()[t.asignado]?.label||t.asignado) : "";
+  const details = [t.notas, assigneeLabel ? `Encargado: ${assigneeLabel}` : ""].filter(Boolean).join("\n");
+  const p = new URLSearchParams({text:t.titulo||"Evento Theia"});
+  if(dates) p.set("dates", dates);
+  if(details) p.set("details", details);
+  p.set("add", cal);
+  return `https://calendar.google.com/calendar/r/eventedit?${p}`;
+};
+
+function TareasView({ username }) {
+  const [tareas, setTareas]   = useState(() => lsGet(TAREAS_KEY,[]));
+  const [modal, setModal]     = useState(false);
+  const [editId, setEditId]   = useState(null);
+  const [filterTipo, setFilterTipo]       = useState("");
+  const [filterAsig, setFilterAsig]       = useState("");
+  const [filterEst, setFilterEst]         = useState("pendiente");
+  const [filterCal, setFilterCal]         = useState("");
+  const EMPTY = {titulo:"",tipo:"reunion",fecha:todayStr(),hora:"",duracion:"60",calendario:"andco",asignado:username||"",notas:"",estado:"pendiente"};
+  const [form, setForm] = useState(EMPTY);
+
+  const save = (arr) => { setTareas(arr); lsSet(TAREAS_KEY,arr); };
+
+  const openNew  = () => { setEditId(null); setForm({...EMPTY,asignado:username||""}); setModal(true); };
+  const openEdit = (id) => { const t=tareas.find(x=>x.id===id); if(t){setEditId(id);setForm({...t});setModal(true);} };
+  const saveTarea = () => {
+    if(!form.titulo.trim()) return;
+    if(editId) save(tareas.map(t=>t.id===editId?{...t,...form}:t));
+    else save([{id:uid(),...form,createdAt:todayStr(),createdBy:username||""},...tareas]);
+    setModal(false);
+  };
+  const deleteTarea = (id) => { if(window.confirm("¿Eliminar esta tarea?")) save(tareas.filter(t=>t.id!==id)); };
+  const toggleEst = (id) => {
+    save(tareas.map(t=>t.id===id?{...t,estado:t.estado==="completado"?"pendiente":"completado"}:t));
+  };
+
+  const today = todayStr();
+  const thisWeek = (() => { const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); })();
+
+  let filtered = tareas.filter(t=>{
+    if(filterTipo && t.tipo!==filterTipo) return false;
+    if(filterAsig && t.asignado!==filterAsig) return false;
+    if(filterEst && t.estado!==filterEst) return false;
+    if(filterCal && t.calendario!==filterCal) return false;
+    return true;
+  }).sort((a,b)=>{
+    if(a.estado==="completado"&&b.estado!=="completado") return 1;
+    if(b.estado==="completado"&&a.estado!=="completado") return -1;
+    return (a.fecha||"9")>(b.fecha||"9") ? 1 : -1;
+  });
+
+  const stats = {
+    total: tareas.filter(t=>t.estado!=="completado").length,
+    hoy:   tareas.filter(t=>t.fecha===today&&t.estado!=="completado").length,
+    semana:tareas.filter(t=>t.fecha>=today&&t.fecha<=thisWeek&&t.estado!=="completado").length,
+    comp:  tareas.filter(t=>t.estado==="completado").length,
+  };
+
+  const inp = {width:"100%",border:`1px solid ${T.gray200}`,borderRadius:8,padding:"9px 12px",fontSize:13,color:T.black,outline:"none",fontFamily:"inherit",background:T.gray50};
+  const selInp = {...inp,appearance:"none"};
+  const lbl = {display:"block",fontSize:11,color:T.gray500,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6};
+
+  return (
+    <div style={{padding:24,overflowY:"auto",height:"100%",background:T.gray50}}>
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <h2 style={{fontSize:22,fontWeight:800,color:T.black,letterSpacing:"0.05em"}}>TAREAS & EVENTOS</h2>
+          <div style={{fontSize:13,color:T.gray500,marginTop:3}}>Despachos · Compras · Reuniones · Entregas · Control de agenda</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {Object.entries(CALENDARS).map(([k,c])=>(
+            <a key={k} href={`https://calendar.google.com/calendar/r`} target="_blank" rel="noreferrer"
+               style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",border:`1px solid ${T.gray200}`,borderRadius:7,fontSize:12,color:T.gray600,textDecoration:"none",background:T.white}}>
+              📅 {c.short}
+            </a>
+          ))}
+          <button onClick={openNew} style={{background:T.black,color:T.white,border:"none",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+ Nueva tarea</button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:20}}>
+        {[
+          {label:"Pendientes",value:stats.total,col:T.black},
+          {label:"🗓 Hoy",value:stats.hoy,col:"#e05c5c"},
+          {label:"📅 Esta semana",value:stats.semana,col:"#e09b3d"},
+          {label:"✓ Completadas",value:stats.comp,col:"#4caf7d"},
+        ].map(s=>(
+          <div key={s.label} style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:10,padding:"13px 16px"}}>
+            <div style={{fontSize:10,color:T.gray400,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>{s.label}</div>
+            <div style={{fontSize:26,fontWeight:800,color:s.col,lineHeight:1}}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
+        <div style={{position:"relative"}}>
+          <select value={filterEst} onChange={e=>setFilterEst(e.target.value)} style={{...selInp,minWidth:140}}>
+            <option value="">Todos los estados</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="en_progreso">En progreso</option>
+            <option value="completado">Completadas</option>
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+        </div>
+        <div style={{position:"relative"}}>
+          <select value={filterTipo} onChange={e=>setFilterTipo(e.target.value)} style={{...selInp,minWidth:140}}>
+            <option value="">Todos los tipos</option>
+            {Object.entries(TIPO_CFG).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+        </div>
+        <div style={{position:"relative"}}>
+          <select value={filterAsig} onChange={e=>setFilterAsig(e.target.value)} style={{...selInp,minWidth:160}}>
+            <option value="">Todos los encargados</option>
+            {Object.entries(getEffectiveUsers()).map(([u,d])=><option key={u} value={u}>{d.label}</option>)}
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+        </div>
+        <div style={{position:"relative"}}>
+          <select value={filterCal} onChange={e=>setFilterCal(e.target.value)} style={{...selInp,minWidth:140}}>
+            <option value="">Ambos calendarios</option>
+            {Object.entries(CALENDARS).map(([k,c])=><option key={k} value={k}>{c.short}</option>)}
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+        </div>
+        {(filterTipo||filterAsig||filterCal||(filterEst&&filterEst!=="pendiente"))&&
+          <button onClick={()=>{setFilterTipo("");setFilterAsig("");setFilterEst("pendiente");setFilterCal("");}} style={{background:"none",border:`1px solid ${T.gray300}`,borderRadius:7,color:T.gray500,fontSize:12,cursor:"pointer",padding:"6px 10px",fontFamily:"inherit"}}>Limpiar</button>}
+      </div>
+
+      {/* Task list */}
+      {filtered.length===0 && (
+        <div style={{textAlign:"center",padding:"50px 20px",color:T.gray300}}>
+          <div style={{fontSize:40,marginBottom:12}}>📋</div>
+          <div style={{fontSize:14}}>No hay tareas con estos filtros</div>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {filtered.map(t=>{
+          const tc  = TIPO_CFG[t.tipo] || TIPO_CFG.otro;
+          const cal = CALENDARS[t.calendario] || CALENDARS.andco;
+          const done = t.estado==="completado";
+          const isHoy = t.fecha===today;
+          const isPast = t.fecha && t.fecha<today && !done;
+          const assigneeLabel = getEffectiveUsers()[t.asignado]?.label || t.asignado || "—";
+          return (
+            <div key={t.id} style={{background:T.white,border:`1px solid ${isPast?"#FECACA":isHoy?"#FDE68A":T.gray200}`,borderRadius:12,padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",opacity:done?0.55:1,transition:"opacity .2s"}}>
+              {/* Checkbox */}
+              <button onClick={()=>toggleEst(t.id)} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:5,border:`2px solid ${done?"#4caf7d":T.gray300}`,background:done?"#4caf7d":"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,transition:"all .15s"}}>
+                {done?"✓":""}
+              </button>
+              {/* Type indicator */}
+              <div style={{flexShrink:0,width:36,height:36,borderRadius:8,background:tc.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,marginTop:-2}}>{tc.icon}</div>
+              {/* Content */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                  <span style={{fontWeight:700,fontSize:14,color:done?T.gray400:T.black,textDecoration:done?"line-through":"none"}}>{t.titulo}</span>
+                  <span style={{background:tc.bg,color:tc.color,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700}}>{tc.icon} {tc.label}</span>
+                  {t.estado==="en_progreso"&&<span style={{background:"#FEF9C3",color:"#854D0E",borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700}}>⚡ En progreso</span>}
+                  <span style={{background:`${cal.color}15`,color:cal.color,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:600}}>📅 {cal.short}</span>
+                </div>
+                <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:T.gray500}}>
+                  {t.fecha&&<span style={{color:isPast?"#DC2626":isHoy?"#D97706":T.gray500,fontWeight:isPast||isHoy?600:400}}>
+                    {isPast?"⚠ ":"⏰ "}{new Date(t.fecha+"T00:00:00").toLocaleDateString("es-AR",{weekday:"short",day:"2-digit",month:"short"})}
+                    {t.hora&&` · ${t.hora}`}
+                    {t.duracion&&` (${t.duracion} min)`}
+                  </span>}
+                  {t.asignado&&<span>👤 {assigneeLabel}</span>}
+                </div>
+                {t.notas&&<div style={{fontSize:12,color:T.gray500,marginTop:5,fontStyle:"italic"}}>{t.notas}</div>}
+              </div>
+              {/* Actions */}
+              <div style={{display:"flex",gap:4,flexShrink:0}}>
+                <a href={gcalLink(t)} target="_blank" rel="noreferrer"
+                   title="Abrir en Google Calendar"
+                   style={{display:"flex",alignItems:"center",justifyContent:"center",width:30,height:30,border:`1px solid ${T.gray200}`,borderRadius:6,textDecoration:"none",fontSize:14,background:"none",color:T.gray500}}>
+                  📅
+                </a>
+                {t.estado!=="completado"&&(
+                  <button onClick={()=>save(tareas.map(x=>x.id===t.id?{...x,estado:x.estado==="en_progreso"?"pendiente":"en_progreso"}:x))} title="Marcar en progreso" style={{width:30,height:30,border:`1px solid ${T.gray200}`,borderRadius:6,background:"none",cursor:"pointer",fontSize:14}}>⚡</button>
+                )}
+                <button onClick={()=>openEdit(t.id)} title="Editar" style={{width:30,height:30,border:`1px solid ${T.gray200}`,borderRadius:6,background:"none",cursor:"pointer",fontSize:14}}>✏️</button>
+                <button onClick={()=>deleteTarea(t.id)} title="Eliminar" style={{width:30,height:30,border:`1px solid ${T.gray200}`,borderRadius:6,background:"none",cursor:"pointer",fontSize:14,color:T.gray400}}>✕</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* MODAL */}
+      {modal&&(
+        <div onClick={e=>{if(e.target===e.currentTarget)setModal(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:T.white,borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:28,boxShadow:"0 24px 60px #00000040"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+              <div style={{fontSize:18,fontWeight:800,color:T.black,letterSpacing:"0.05em"}}>{editId?"EDITAR TAREA":"NUEVA TAREA"}</div>
+              <button onClick={()=>setModal(false)} style={{background:"none",border:`1px solid ${T.gray200}`,borderRadius:6,width:30,height:30,cursor:"pointer",fontFamily:"inherit",fontSize:14}}>✕</button>
+            </div>
+            <div style={{marginBottom:14}}>
+              <label style={lbl}>Título *</label>
+              <input value={form.titulo} onChange={e=>setForm(p=>({...p,titulo:e.target.value}))} placeholder="Ej: Despacho pedido García · Reunión con arquitectos" style={inp}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+              <div>
+                <label style={lbl}>Tipo</label>
+                <div style={{position:"relative"}}>
+                  <select value={form.tipo} onChange={e=>setForm(p=>({...p,tipo:e.target.value}))} style={selInp}>
+                    {Object.entries(TIPO_CFG).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+                  </select>
+                  <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Estado</label>
+                <div style={{position:"relative"}}>
+                  <select value={form.estado} onChange={e=>setForm(p=>({...p,estado:e.target.value}))} style={selInp}>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_progreso">En progreso</option>
+                    <option value="completado">Completado</option>
+                  </select>
+                  <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Fecha</label>
+                <input type="date" value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))} style={inp}/>
+              </div>
+              <div>
+                <label style={lbl}>Hora</label>
+                <input type="time" value={form.hora} onChange={e=>setForm(p=>({...p,hora:e.target.value}))} style={inp}/>
+              </div>
+              <div>
+                <label style={lbl}>Duración (minutos)</label>
+                <input type="number" value={form.duracion} onChange={e=>setForm(p=>({...p,duracion:e.target.value}))} placeholder="60" min="15" step="15" style={inp}/>
+              </div>
+              <div>
+                <label style={lbl}>Calendario</label>
+                <div style={{position:"relative"}}>
+                  <select value={form.calendario} onChange={e=>setForm(p=>({...p,calendario:e.target.value}))} style={selInp}>
+                    {Object.entries(CALENDARS).map(([k,c])=><option key={k} value={k}>{c.short} — {c.label}</option>)}
+                  </select>
+                  <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+                </div>
+              </div>
+            </div>
+            <div style={{marginBottom:14}}>
+              <label style={lbl}>Encargado / Asignado a</label>
+              <div style={{position:"relative"}}>
+                <select value={form.asignado} onChange={e=>setForm(p=>({...p,asignado:e.target.value}))} style={selInp}>
+                  <option value="">— Sin asignar —</option>
+                  {Object.entries(getEffectiveUsers()).map(([u,d])=><option key={u} value={u}>{d.label} ({u})</option>)}
+                </select>
+                <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:T.gray400,pointerEvents:"none",fontSize:11}}>▾</span>
+              </div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={lbl}>Notas</label>
+              <textarea value={form.notas} onChange={e=>setForm(p=>({...p,notas:e.target.value}))} placeholder="Detalle de la tarea, dirección, contacto..." style={{...inp,minHeight:70,resize:"vertical"}}/>
+            </div>
+            {/* Preview GCal link */}
+            {form.titulo&&form.fecha&&(
+              <div style={{background:T.gray50,borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:12,color:T.gray500,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span>Vista previa Google Calendar:</span>
+                <a href={gcalLink(form)} target="_blank" rel="noreferrer" style={{color:"#4caf7d",fontWeight:600,textDecoration:"none"}}>Abrir en Google Calendar ↗</a>
+              </div>
+            )}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setModal(false)} style={{padding:"9px 18px",borderRadius:8,border:`1px solid ${T.gray200}`,background:"none",color:T.gray600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancelar</button>
+              <button onClick={saveTarea} style={{padding:"9px 22px",borderRadius:8,background:T.black,border:"none",color:T.white,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Guardar tarea</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── CRM UTILS ────────────────────────────
 const CRM_KEY = "theia_crm_v1";
 const MET_KEY = "theia_met_v1";
@@ -1735,25 +2193,25 @@ const lsSet = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{
 
 // ─── CRM VIEW ─────────────────────────────
 function CRMView({ username }) {
-  const userCrmKey = `${CRM_KEY}_${username||"default"}`;
-  const [clients, setClients]       = useState(() => lsGet(userCrmKey,[]));
-  const [modal, setModal]           = useState(null); // null | "new" | "edit" | "log"
+  const [clients, setClients]       = useState(() => lsGet(CRM_KEY,[]));
+  const [modal, setModal]           = useState(null);
   const [editId, setEditId]         = useState(null);
   const [logId, setLogId]           = useState(null);
   const [pipeFilter, setPipeFilter] = useState("");
   const [search, setSearch]         = useState("");
-  const [filterFuente, setFilterFuente] = useState("");
-  const [filterUrgency, setFilterUrgency] = useState("");
-  const [form, setForm] = useState({nombre:"",telefono:"",estado:"lead_frio",fuente:"meta",producto:"",presupuesto:"",fechaContacto:todayStr(),ultimaAccion:"",proximaAccion:"",notas:""});
+  const [filterFuente, setFilterFuente]     = useState("");
+  const [filterAsignado, setFilterAsignado] = useState("");
+  const [filterUrgency, setFilterUrgency]   = useState("");
+  const [form, setForm] = useState({nombre:"",telefono:"",estado:"lead_frio",fuente:"meta",producto:"",presupuesto:"",fechaContacto:todayStr(),ultimaAccion:"",proximaAccion:"",notas:"",asignado:username||""});
   const [logText, setLogText]       = useState("");
   const [logEstado, setLogEstado]   = useState("");
   const [logProxima, setLogProxima] = useState("");
 
-  const save = (arr) => { setClients(arr); lsSet(userCrmKey,arr); };
+  const save = (arr) => { setClients(arr); lsSet(CRM_KEY,arr); };
 
   const openNew = () => {
     setEditId(null);
-    setForm({nombre:"",telefono:"",estado:"lead_frio",fuente:"meta",producto:"",presupuesto:"",fechaContacto:todayStr(),ultimaAccion:"",proximaAccion:"",notas:""});
+    setForm({nombre:"",telefono:"",estado:"lead_frio",fuente:"meta",producto:"",presupuesto:"",fechaContacto:todayStr(),ultimaAccion:"",proximaAccion:"",notas:"",asignado:username||""});
     setModal("new");
   };
   const openEdit = (id) => {
@@ -1790,6 +2248,7 @@ function CRMView({ username }) {
   let filtered = clients.filter(c=>{
     if(search && !(`${c.nombre} ${c.telefono} ${c.producto}`).toLowerCase().includes(search.toLowerCase())) return false;
     if(filterFuente && c.fuente!==filterFuente) return false;
+    if(filterAsignado && c.asignado!==filterAsignado) return false;
     if(pipeFilter && c.estado!==pipeFilter) return false;
     if(filterUrgency && reminderLv(c)!==filterUrgency) return false;
     return true;
@@ -1851,6 +2310,13 @@ function CRMView({ username }) {
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar..." style={{...inp,minWidth:180,maxWidth:240}}/>
         <div style={{position:"relative"}}>
+          <select value={filterAsignado} onChange={e=>setFilterAsignado(e.target.value)} style={selInp}>
+            <option value="">Todos los encargados</option>
+            {Object.entries(getEffectiveUsers()).map(([u,d])=><option key={u} value={u}>{d.label} ({u})</option>)}
+          </select>
+          <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span>
+        </div>
+        <div style={{position:"relative"}}>
           <select value={filterFuente} onChange={e=>setFilterFuente(e.target.value)} style={selInp}>
             <option value="">Todas las fuentes</option>
             {Object.entries(FUENTE_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
@@ -1865,7 +2331,7 @@ function CRMView({ username }) {
           </select>
           <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span>
         </div>
-        {(search||filterFuente||pipeFilter||filterUrgency)&&<button onClick={()=>{setSearch("");setFilterFuente("");setPipeFilter("");setFilterUrgency("");}} style={{background:"none",border:`1px solid ${dborder2}`,borderRadius:7,color:dtext2,fontSize:12,cursor:"pointer",padding:"5px 10px",fontFamily:"inherit"}}>Limpiar</button>}
+        {(search||filterFuente||filterAsignado||pipeFilter||filterUrgency)&&<button onClick={()=>{setSearch("");setFilterFuente("");setFilterAsignado("");setPipeFilter("");setFilterUrgency("");}} style={{background:"none",border:`1px solid ${dborder2}`,borderRadius:7,color:dtext2,fontSize:12,cursor:"pointer",padding:"5px 10px",fontFamily:"inherit"}}>Limpiar</button>}
       </div>
 
       {/* Client cards */}
@@ -1892,6 +2358,7 @@ function CRMView({ username }) {
               <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
                 <span style={{background:dsurf2,color:ecol,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em"}}>{ESTADO_LABELS[c.estado]||c.estado}</span>
                 <span style={{background:dsurf2,color:dtext2,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:600}}>{FUENTE_LABELS[c.fuente]||c.fuente||"—"}</span>
+                {c.asignado&&<span style={{background:"#c9a96e20",color:"#c9a96e",borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700,border:"1px solid #c9a96e30"}}>👤 {getEffectiveUsers()[c.asignado]?.label||c.asignado}</span>}
               </div>
               {c.producto&&<div style={{fontSize:11,color:dtext2,marginBottom:3}}><strong style={{color:dtext}}>Producto:</strong> {c.producto}</div>}
               {c.presupuesto&&<div style={{fontSize:11,color:dtext2,marginBottom:3}}><strong style={{color:dtext}}>Presupuesto:</strong> ${Number(c.presupuesto).toLocaleString("es-AR")}</div>}
@@ -1940,9 +2407,29 @@ function CRMView({ username }) {
                 <input value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={inp}/>
               </div>
             ))}
+            <div style={{marginBottom:12}}>
+              <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Encargado / Asignado a</label>
+              <div style={{position:"relative"}}>
+                <select value={form.asignado||""} onChange={e=>setForm(p=>({...p,asignado:e.target.value}))} style={selInp}>
+                  <option value="">— Sin asignar —</option>
+                  {Object.entries(getEffectiveUsers()).map(([u,d])=><option key={u} value={u}>{d.label} ({u})</option>)}
+                </select>
+                <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span>
+              </div>
+            </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
               <div><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Presupuesto aprox. ($)</label><input type="number" value={form.presupuesto} onChange={e=>setForm(p=>({...p,presupuesto:e.target.value}))} placeholder="0" style={inp}/></div>
               <div><label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Último contacto</label><input type="date" value={form.fechaContacto} onChange={e=>setForm(p=>({...p,fechaContacto:e.target.value}))} style={inp}/></div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label style={{display:"block",fontSize:10,color:dtext3,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Responsable / Encargado</label>
+              <div style={{position:"relative"}}>
+                <select value={form.asignado} onChange={e=>setForm(p=>({...p,asignado:e.target.value}))} style={selInp}>
+                  <option value="">— Sin asignar —</option>
+                  {Object.entries(getEffectiveUsers()).map(([u,d])=><option key={u} value={u}>{d.label} ({u})</option>)}
+                </select>
+                <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:dtext3,pointerEvents:"none",fontSize:10}}>▾</span>
+              </div>
             </div>
             {[{label:"Última acción",key:"ultimaAccion",placeholder:"Ej: Envié catálogo WPC"},{label:"Próxima acción",key:"proximaAccion",placeholder:"Ej: Llamar para confirmar visita"},{label:"Notas",key:"notas",placeholder:"Contexto, detalles del proyecto...",textarea:true}].map(f=>(
               <div key={f.key} style={{marginBottom:12}}>
@@ -2128,6 +2615,8 @@ function MetricasView() {
 
 function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
   const adminItems = [
+    {id:"dashboard",icon:<IDash/>,l:"Dashboard"},
+    {divider:true},
     {id:"chat",icon:<IChat/>,l:"Chat + Corrección"},
     {id:"calc",icon:<ICalc/>,l:"Calculadora"},
     {id:"catalog",icon:<ICatalog/>,l:"Catálogo"},
@@ -2136,17 +2625,21 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
     {id:"alerts",icon:<IWarn/>,l:"Alertas",badge:alertCount},
     {divider:true},
     {id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},
+    {id:"tareas",icon:<ITask/>,l:"Tareas y Eventos"},
     {id:"metrics",icon:<IMetrics/>,l:"Métricas"},
     {id:"cotizador",icon:<IEnvios/>,l:"Cotizador Envíos"},
     {divider:true},
     {id:"usuarios",icon:<IUsers/>,l:"Usuarios"},
   ];
   const operadorItems = [
+    {id:"dashboard",icon:<IDash/>,l:"Dashboard"},
+    {divider:true},
     {id:"chat",icon:<IChat/>,l:"Chat + Corrección"},
     {id:"calc",icon:<ICalc/>,l:"Calculadora"},
     {id:"catalog",icon:<ICatalog/>,l:"Catálogo"},
     {divider:true},
     {id:"crm",icon:<ICRM/>,l:"CRM",badge:crmBadge},
+    {id:"tareas",icon:<ITask/>,l:"Tareas y Eventos"},
     {id:"metrics",icon:<IMetrics/>,l:"Métricas"},
     {id:"cotizador",icon:<IEnvios/>,l:"Cotizador Envíos"},
   ];
@@ -2184,11 +2677,10 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
 
 // ─── PANEL ────────────────────────────────
 function Panel({ role, username, onLogout, kb, setKb }) {
-  const [tab,setTab]=useState("chat");
+  const [tab,setTab]=useState("dashboard");
   const [alerts,setAlerts]=useState([]);
-  const userCrmKey = `${CRM_KEY}_${username||"default"}`;
-  const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(userCrmKey)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
-  const tabLabels = {chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",metrics:"Métricas",cotizador:"Cotizador de Envíos",usuarios:"Gestión de Usuarios"};
+  const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(CRM_KEY)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
+  const tabLabels = {dashboard:"Dashboard",chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",tareas:"Tareas y Eventos",metrics:"Métricas",cotizador:"Cotizador de Envíos",usuarios:"Gestión de Usuarios"};
   const desde = role==="admin"?"Administrador":"Vendedor";
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:"Outfit,sans-serif",background:T.gray50}}>
@@ -2199,6 +2691,7 @@ function Panel({ role, username, onLogout, kb, setKb }) {
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6,fontSize:11,color:T.green}}><span style={{width:5,height:5,borderRadius:"50%",background:T.green,display:"inline-block"}}></span>Agente activo</div>
         </div>
         <div style={{flex:1,overflow:"hidden"}}>
+          {tab==="dashboard" && <div style={{height:"100%",overflowY:"auto"}}><DashboardView username={username} role={role}/></div>}
           {tab==="chat"    && <ChatCore kb={kb} setKb={setKb} setAlerts={setAlerts} isAdmin={role==="admin"} desde={desde}/>}
           {tab==="calc"    && <div style={{height:"100%",overflowY:"auto"}}><Calculadora/></div>}
           {tab==="catalog" && <CatalogoView/>}
@@ -2206,6 +2699,7 @@ function Panel({ role, username, onLogout, kb, setKb }) {
           {tab==="train"   && <div style={{display:"flex",height:"100%"}}><TrainView kb={kb} setKb={setKb}/></div>}
           {tab==="alerts"  && <AlertsView alerts={alerts} setAlerts={setAlerts} setKb={setKb}/>}
           {tab==="crm"     && <div style={{height:"100%",overflowY:"auto"}}><CRMView username={username}/></div>}
+          {tab==="tareas"  && <div style={{height:"100%",overflowY:"auto"}}><TareasView username={username}/></div>}
           {tab==="metrics" && <div style={{height:"100%",overflowY:"auto"}}><MetricasView/></div>}
           {tab==="cotizador" && <div style={{height:"100%",overflow:"hidden"}}><CotizadorView role={role}/></div>}
           {tab==="usuarios"  && <UsersView/>}
