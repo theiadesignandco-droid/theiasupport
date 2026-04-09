@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 
 const GF = "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');";
 const T = {
@@ -9,14 +9,143 @@ const T = {
   amber:"#D97706", amberLight:"#FFFBEB",
 };
 
+// ═══════════════════════════════════════════════════════════════
+// CLOUD SYNC — JSONBin.io
+// Un único bin compartido por todo el equipo.
+// Admin configura BIN_ID y API_KEY desde Usuarios → Configuración de sync.
+// ═══════════════════════════════════════════════════════════════
+const SYNC_CFG_KEY  = "theia_sync_cfg";          // localStorage only (device-local, es la config)
+const SYNC_CACHE_KEY= "theia_sync_cache";         // localStorage cache del último fetch
+const JSONBIN_BASE  = "https://api.jsonbin.io/v3/b";
+
+function getSyncCfg()  { try{return JSON.parse(localStorage.getItem(SYNC_CFG_KEY)||"null");}catch{return null;} }
+function saveSyncCfg(c){ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(c)); }
+function getSyncCache(){ try{return JSON.parse(localStorage.getItem(SYNC_CACHE_KEY)||"null");}catch{return null;} }
+function setSyncCache(d){ try{localStorage.setItem(SYNC_CACHE_KEY,JSON.stringify(d));}catch{} }
+
+// Lee el bin de la nube → retorna { users, crm, tareas, metrics } o null si falla
+async function cloudRead() {
+  const cfg = getSyncCfg();
+  if (!cfg?.binId || !cfg?.apiKey) return null;
+  try {
+    const r = await fetch(`${JSONBIN_BASE}/${cfg.binId}/latest`, {
+      headers: { "X-Master-Key": cfg.apiKey, "X-Bin-Meta": "false" }
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    setSyncCache(d);
+    return d;
+  } catch { return null; }
+}
+
+// Escribe al bin (debounced externamente)
+async function cloudWrite(data) {
+  const cfg = getSyncCfg();
+  if (!cfg?.binId || !cfg?.apiKey) return false;
+  try {
+    const r = await fetch(`${JSONBIN_BASE}/${cfg.binId}`, {
+      method: "PUT",
+      headers: { "Content-Type":"application/json", "X-Master-Key": cfg.apiKey },
+      body: JSON.stringify(data)
+    });
+    if (r.ok) { setSyncCache(data); return true; }
+    return false;
+  } catch { return false; }
+}
+
+// Crea un bin nuevo con datos vacíos, retorna { binId }
+async function cloudCreateBin(apiKey) {
+  const initial = { users:{}, crm:[], tareas:[], metrics:[] };
+  const r = await fetch(JSONBIN_BASE, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", "X-Master-Key": apiKey, "X-Bin-Name": "Theia Platform", "X-Bin-Private":"true" },
+    body: JSON.stringify(initial)
+  });
+  if (!r.ok) throw new Error("No se pudo crear el bin. Verificá la API key.");
+  const d = await r.json();
+  return { binId: d.metadata.id };
+}
+
+// ─── CLOUD STORE HOOK ─────────────────────────────────────────
+// Contexto global: un único objeto en memoria sincronizado con la nube
+let _cloudData = null;        // datos en memoria ({ users, crm, tareas, metrics })
+let _cloudListeners = [];     // componentes suscritos
+let _syncTimer = null;        // debounce timer
+let _syncStatus = "idle";     // idle | syncing | error | ok
+
+function notifyListeners() { _cloudListeners.forEach(fn => fn()); }
+
+function getCloudData() {
+  if (_cloudData) return _cloudData;
+  // fallback: lee del cache local
+  const cache = getSyncCache();
+  if (cache) { _cloudData = cache; return _cloudData; }
+  // fallback: datos vacíos
+  _cloudData = { users:{}, crm:[], tareas:[], metrics:[] };
+  return _cloudData;
+}
+
+function patchCloud(key, value) {
+  _cloudData = { ...getCloudData(), [key]: value };
+  setSyncCache(_cloudData);  // escribe cache inmediato
+  notifyListeners();
+  // debounce escritura a la nube
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    _syncStatus = "syncing"; notifyListeners();
+    const ok = await cloudWrite(_cloudData);
+    _syncStatus = ok ? "ok" : "error";
+    notifyListeners();
+    if (_syncStatus === "ok") setTimeout(()=>{ if(_syncStatus==="ok"){_syncStatus="idle";notifyListeners();} }, 3000);
+  }, 800);
+}
+
+async function initCloud() {
+  const cfg = getSyncCfg();
+  if (!cfg?.binId || !cfg?.apiKey) {
+    // Sin config → usa datos locales vacíos
+    _cloudData = { users:{}, crm:[], tareas:[], metrics:[] };
+    notifyListeners();
+    return;
+  }
+  _syncStatus = "syncing"; notifyListeners();
+  const remote = await cloudRead();
+  if (remote) {
+    _cloudData = remote;
+    _syncStatus = "ok"; 
+    setTimeout(()=>{ if(_syncStatus==="ok"){_syncStatus="idle";notifyListeners();} }, 2000);
+  } else {
+    // Sin conexión: usa cache
+    _cloudData = getSyncCache() || { users:{}, crm:[], tareas:[], metrics:[] };
+    _syncStatus = "error";
+  }
+  notifyListeners();
+}
+
+// Hook para componentes que consumen el cloud store
+function useCloud(key) {
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    const fn = () => forceRender(n => n+1);
+    _cloudListeners.push(fn);
+    return () => { _cloudListeners = _cloudListeners.filter(f=>f!==fn); };
+  }, []);
+  const data = getCloudData();
+  return [
+    data[key] ?? [],
+    (val) => patchCloud(key, val)
+  ];
+}
+
+// ─── USUARIOS (cloud-aware) ────────────────────────────────────
 const USERS = {
   sociostheia: { pass:"theiadesing25",  role:"admin",    label:"Administrador" },
   theiaventas: { pass:"libertador6501", role:"vendedor", label:"Vendedor"      },
 };
-const EXTRA_USERS_KEY = "theia_users_v2";
-const getExtraUsers = () => { try{ return JSON.parse(localStorage.getItem(EXTRA_USERS_KEY)||"{}"); }catch{ return {}; } };
-const getEffectiveUsers = () => ({ ...USERS, ...getExtraUsers() });
-const saveExtraUsers = (obj) => localStorage.setItem(EXTRA_USERS_KEY, JSON.stringify(obj));
+const EXTRA_USERS_KEY = "theia_users_v2"; // legacy key (no se usa más)
+function getExtraUsers()  { return getCloudData().users || {}; }
+function getEffectiveUsers() { return { ...USERS, ...getExtraUsers() }; }
+function saveExtraUsers(obj) { patchCloud("users", obj); }
 const OWNER_WA = "541134423383";
 const SHEET_ID = "1N4p7U1umPDv3umT38f6zTyKQSjO7vmIIwPdmVe6xt1Y";
 
@@ -305,16 +434,21 @@ const ITareas  = ()       => <Ic d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 
 
 // ─── USUARIOS VIEW ────────────────────────
 function UsersView() {
-  const [extra, setExtra]     = useState(getExtraUsers);
+  const [extraCloud, setExtraCloud] = useCloud("users");
+  const extra = extraCloud || {};
   const [form, setForm]       = useState({user:"",pass:"",role:"operador",label:""});
   const [err, setErr]         = useState("");
   const [ok, setOk]           = useState("");
   const [showPass, setShowPass] = useState({});
+  const [syncTab, setSyncTab] = useState("users");
+  const [syncCfg, setSyncCfgState] = useState(()=>getSyncCfg()||{binId:"",apiKey:""});
+  const [syncMsg, setSyncMsg] = useState("");
+  const [syncLoading, setSyncLoading] = useState(false);
 
-  const allUsers = getEffectiveUsers();
+  const allUsers = { ...USERS, ...extra };
   const isBuiltin = (u) => !!USERS[u];
 
-  const save = (obj) => { saveExtraUsers(obj); setExtra({...obj}); };
+  const save = (obj) => { saveExtraUsers(obj); };
 
   const addUser = () => {
     setErr(""); setOk("");
@@ -440,6 +574,87 @@ function UsersView() {
           💡 <strong>Vendedor:</strong> Chat IA, Calculadora y Catálogo. &nbsp;·&nbsp; <strong>Operador:</strong> todo excepto Alertas, Entrenar IA, Conocimiento, config. de logística y Usuarios. &nbsp;·&nbsp; <strong>Administrador:</strong> acceso total.
         </div>
       </div>
+
+      {/* ── SYNC CONFIG ── */}
+      <div style={{background:T.white,border:`1px solid ${T.gray200}`,borderRadius:12,padding:20,marginTop:20}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:6,color:T.black,display:"flex",alignItems:"center",gap:8}}>
+          ☁️ Sincronización en la nube
+          {getSyncCfg()?.binId
+            ? <span style={{background:T.greenLight,color:T.green,borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:600}}>✓ Configurado</span>
+            : <span style={{background:"#FEF9C3",color:"#854D0E",borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:600}}>Sin configurar</span>
+          }
+        </div>
+        <p style={{fontSize:12,color:T.gray500,marginBottom:16,lineHeight:1.6}}>
+          Usamos <strong>JSONBin.io</strong> (gratis) para guardar todos los datos en la nube y acceder desde cualquier dispositivo.<br/>
+          <strong>Paso 1:</strong> Creá una cuenta en <a href="https://jsonbin.io" target="_blank" rel="noreferrer" style={{color:T.blue}}>jsonbin.io</a> →
+          <strong> Paso 2:</strong> Copiá tu <em>Master Key</em> de la sección API Keys →
+          <strong> Paso 3:</strong> Pegala abajo y hacé clic en "Conectar" — se crea el bin automáticamente.
+        </p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div>
+            <label style={{display:"block",fontSize:11,color:T.gray500,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:5}}>Master API Key de JSONBin</label>
+            <input
+              type="password"
+              value={syncCfg.apiKey}
+              onChange={e=>setSyncCfgState(p=>({...p,apiKey:e.target.value}))}
+              placeholder="$2a$10$..."
+              style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit"}}
+            />
+          </div>
+          <div>
+            <label style={{display:"block",fontSize:11,color:T.gray500,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:5}}>Bin ID (se llena automático al conectar)</label>
+            <input
+              value={syncCfg.binId}
+              onChange={e=>setSyncCfgState(p=>({...p,binId:e.target.value}))}
+              placeholder="Se genera automáticamente"
+              style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1px solid ${T.gray200}`,background:T.gray50,color:T.black,fontSize:13,outline:"none",fontFamily:"inherit"}}
+            />
+          </div>
+        </div>
+        {syncMsg && <div style={{background:syncMsg.startsWith("✓")?T.greenLight:"#FEF2F2",border:`1px solid ${syncMsg.startsWith("✓")?"#BBF7D0":"#FECACA"}`,borderRadius:7,padding:"9px 14px",fontSize:12.5,color:syncMsg.startsWith("✓")?T.green:T.red,marginBottom:10}}>{syncMsg}</div>}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button
+            disabled={syncLoading||!syncCfg.apiKey}
+            onClick={async()=>{
+              setSyncLoading(true); setSyncMsg("");
+              try {
+                let binId = syncCfg.binId;
+                if (!binId) {
+                  const res = await cloudCreateBin(syncCfg.apiKey);
+                  binId = res.binId;
+                }
+                const cfg = {apiKey:syncCfg.apiKey, binId};
+                saveSyncCfg(cfg);
+                setSyncCfgState(cfg);
+                // Push current cloud data to new bin
+                await cloudWrite(getCloudData());
+                // Re-init from cloud
+                await initCloud();
+                setSyncMsg("✓ Conectado. Datos sincronizados. Ahora todos los dispositivos comparten la misma base de datos.");
+              } catch(e) {
+                setSyncMsg("✗ Error: " + (e.message||"Verificá la API key"));
+              }
+              setSyncLoading(false);
+            }}
+            style={{padding:"9px 20px",borderRadius:8,background:syncLoading||!syncCfg.apiKey?T.gray200:T.black,color:syncLoading||!syncCfg.apiKey?T.gray400:T.white,border:"none",fontSize:13,fontWeight:700,cursor:syncLoading||!syncCfg.apiKey?"not-allowed":"pointer",fontFamily:"inherit"}}
+          >{syncLoading?"Conectando...":"Conectar y sincronizar"}</button>
+          <button
+            onClick={async()=>{
+              setSyncLoading(true); setSyncMsg("");
+              const d = await cloudRead();
+              if (d) { setSyncMsg("✓ Datos actualizados desde la nube."); notifyListeners(); }
+              else setSyncMsg("✗ No se pudo leer desde la nube. Verificá la conexión.");
+              setSyncLoading(false);
+            }}
+            disabled={syncLoading||!getSyncCfg()?.binId}
+            style={{padding:"9px 16px",borderRadius:8,background:"none",border:`1px solid ${T.gray300}`,color:T.gray600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}
+          >Forzar sincronización</button>
+          {getSyncCfg()?.binId && <button
+            onClick={()=>{if(window.confirm("¿Desconectar la nube? Los datos quedan en caché local.")){{saveSyncCfg(null);setSyncCfgState({binId:"",apiKey:""});setSyncMsg("Desconectado.");}}}}
+            style={{padding:"9px 16px",borderRadius:8,background:"none",border:`1px solid #FECACA`,color:T.red,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}
+          >Desconectar</button>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -453,9 +668,9 @@ const TAREA_EST   = {pendiente:"Pendiente",en_progreso:"En progreso",completado:
 
 // ─── DASHBOARD VIEW ───────────────────────
 function DashboardView({ username, role }) {
-  const clients = lsGet(CRM_KEY,[]);
-  const tareas  = lsGet(TAREAS_KEY,[]);
-  const hoy     = todayStr();
+  const [clients]  = useCloud("crm");
+  const [tareas]   = useCloud("tareas");
+  const hoy        = todayStr();
 
   const urgentes  = clients.filter(c=>reminderLv(c)==="urgente");
   const warning   = clients.filter(c=>reminderLv(c)==="warning");
@@ -1901,7 +2116,9 @@ const gcalLink = (t) => {
 };
 
 function TareasView({ username }) {
-  const [tareas, setTareas]   = useState(() => lsGet(TAREAS_KEY,[]));
+  const [tareas, setTareasCloud]   = useCloud("tareas");
+  const setTareas = setTareasCloud;
+  const save = (arr) => { setTareasCloud(arr); };
   const [modal, setModal]     = useState(false);
   const [editId, setEditId]   = useState(null);
   const [filterTipo, setFilterTipo]       = useState("");
@@ -1911,7 +2128,7 @@ function TareasView({ username }) {
   const EMPTY = {titulo:"",tipo:"reunion",fecha:todayStr(),hora:"",duracion:"60",calendario:"andco",asignado:username||"",notas:"",estado:"pendiente"};
   const [form, setForm] = useState(EMPTY);
 
-  const save = (arr) => { setTareas(arr); lsSet(TAREAS_KEY,arr); };
+  // save defined above with useCloud
 
   const openNew  = () => { setEditId(null); setForm({...EMPTY,asignado:username||""}); setModal(true); };
   const openEdit = (id) => { const t=tareas.find(x=>x.id===id); if(t){setEditId(id);setForm({...t});setModal(true);} };
@@ -2188,12 +2405,16 @@ const reminderLv = (c) => {
   if(d>=5) return "warning";
   return "ok";
 };
-const lsGet = (k,def) => { try{ const v=localStorage.getItem(k); return v!=null?JSON.parse(v):def; }catch{ return def; } };
-const lsSet = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+const lsGet = (k, def) => {
+  // Legacy local reads — solo para datos que NO están en la nube (cotizador config, etc.)
+  try{ const v=localStorage.getItem(k); return v!=null?JSON.parse(v):def; }catch{ return def; }
+};
+const lsSet = (k, v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
 
 // ─── CRM VIEW ─────────────────────────────
 function CRMView({ username }) {
-  const [clients, setClients]       = useState(() => lsGet(CRM_KEY,[]));
+  const [clients, setCloudClients] = useCloud("crm");
+  const setClients = setCloudClients;
   const [modal, setModal]           = useState(null);
   const [editId, setEditId]         = useState(null);
   const [logId, setLogId]           = useState(null);
@@ -2207,7 +2428,7 @@ function CRMView({ username }) {
   const [logEstado, setLogEstado]   = useState("");
   const [logProxima, setLogProxima] = useState("");
 
-  const save = (arr) => { setClients(arr); lsSet(CRM_KEY,arr); };
+  const save = (arr) => { setCloudClients(arr); };
 
   const openNew = () => {
     setEditId(null);
@@ -2474,11 +2695,11 @@ function CRMView({ username }) {
 
 // ─── MÉTRICAS VIEW ────────────────────────
 function MetricasView() {
-  const [data, setData] = useState(() => lsGet(MET_KEY,[]));
+  const [data, setCloudMetrics] = useCloud("metrics");
   const [form, setForm] = useState({periodo:"",msgs:"",pres:"",cierre:"",monto:"",notas:""});
   const chartRef = useRef(null);
 
-  const saveData = (arr) => { setData(arr); lsSet(MET_KEY,arr); };
+  const saveData = (arr) => { setCloudMetrics(arr); };
   const saveMetric = () => {
     if(!form.periodo.trim()||(!form.msgs&&!form.pres&&!form.cierre)) return;
     saveData([...data,{id:uid(),periodo:form.periodo,msgs:+form.msgs||0,pres:+form.pres||0,cierre:+form.cierre||0,monto:+form.monto||0,notas:form.notas,fecha:new Date().toISOString()}]);
@@ -2679,16 +2900,35 @@ function Sidebar({ role, tab, setTab, onLogout, alertCount, crmBadge }) {
 function Panel({ role, username, onLogout, kb, setKb }) {
   const [tab,setTab]=useState("dashboard");
   const [alerts,setAlerts]=useState([]);
-  const crmUrgent = (() => { try{ const c=JSON.parse(localStorage.getItem(CRM_KEY)||"[]"); return c.filter(x=>reminderLv(x)==="urgente").length; }catch{ return 0; } })();
+  const [, forceRender] = useState(0);
+  useEffect(()=>{
+    const fn = ()=>forceRender(n=>n+1);
+    _cloudListeners.push(fn);
+    return ()=>{ _cloudListeners=_cloudListeners.filter(f=>f!==fn); };
+  },[]);
+  const cloudData = getCloudData();
+  const crmData   = cloudData.crm || [];
+  const crmUrgent = crmData.filter(c=>reminderLv(c)==="urgente").length;
   const tabLabels = {dashboard:"Dashboard",chat:role==="admin"?"Chat + Corrección":"Consultas IA",calc:"Calculadora de Materiales",catalog:"Catálogo de Productos",kb:"Base de Conocimiento",train:"Entrenar IA",alerts:"Alertas de Escalamiento",crm:"CRM — Clientes",tareas:"Tareas y Eventos",metrics:"Métricas",cotizador:"Cotizador de Envíos",usuarios:"Gestión de Usuarios"};
   const desde = role==="admin"?"Administrador":"Vendedor";
+  const syncIcon = _syncStatus==="syncing" ? "🔄" : _syncStatus==="ok" ? "☁️" : _syncStatus==="error" ? "⚠️" : getSyncCfg()?.binId ? "☁️" : "💾";
+  const syncLabel = _syncStatus==="syncing" ? "Sincronizando..." : _syncStatus==="ok" ? "Sincronizado" : _syncStatus==="error" ? "Sin conexión (caché)" : getSyncCfg()?.binId ? "Nube" : "Local";
+  const syncColor = _syncStatus==="error" ? T.amber : _syncStatus==="syncing" ? "#60A5FA" : T.green;
   return(
     <div style={{display:"flex",height:"100vh",fontFamily:"Outfit,sans-serif",background:T.gray50}}>
       <Sidebar role={role} tab={tab} setTab={setTab} onLogout={onLogout} alertCount={alerts.length} crmBadge={crmUrgent}/>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{height:50,background:T.white,borderBottom:`1px solid ${T.gray200}`,display:"flex",alignItems:"center",padding:"0 24px",flexShrink:0}}>
           <div style={{fontSize:14,fontWeight:600,color:T.black}}>{tabLabels[tab]||""}</div>
-          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6,fontSize:11,color:T.green}}><span style={{width:5,height:5,borderRadius:"50%",background:T.green,display:"inline-block"}}></span>Agente activo</div>
+          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:14}}>
+            <span style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:syncColor}} title={syncLabel}>
+              <span style={{fontSize:12}}>{syncIcon}</span>
+              <span style={{display:"none"}}>{syncLabel}</span>
+            </span>
+            <span style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:T.green}}>
+              <span style={{width:5,height:5,borderRadius:"50%",background:T.green,display:"inline-block"}}></span>Agente activo
+            </span>
+          </div>
         </div>
         <div style={{flex:1,overflow:"hidden"}}>
           {tab==="dashboard" && <div style={{height:"100%",overflowY:"auto"}}><DashboardView username={username} role={role}/></div>}
@@ -2740,6 +2980,23 @@ function ClientView({ kb, onLogout }) {
 export default function App() {
   const [session,setSession]=useState(null);
   const [kb,setKb]=useState(REAL_KB);
+  const [cloudReady,setCloudReady]=useState(false);
+
+  useEffect(()=>{
+    initCloud().then(()=>setCloudReady(true));
+  },[]);
+
+  if(!cloudReady) return(
+    <div style={{minHeight:"100vh",background:T.black,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"Outfit,sans-serif"}}>
+      <div style={{fontSize:36,fontWeight:800,letterSpacing:"0.2em",color:T.white,marginBottom:8}}>THEIA</div>
+      <div style={{fontSize:11,color:T.gray600,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:28}}>Design & Co · Plataforma</div>
+      <div style={{display:"flex",alignItems:"center",gap:10,color:T.gray500,fontSize:13}}>
+        <div style={{width:16,height:16,border:`2px solid ${T.gray700}`,borderTopColor:T.gray400,borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+        {getSyncCfg()?.binId ? "Conectando con la nube..." : "Iniciando plataforma..."}
+      </div>
+    </div>
+  );
+
   return(
     <div>
       <style>{`${GF}*{box-sizing:border-box;margin:0;padding:0;}body,button,input,textarea,select{font-family:'Outfit',sans-serif;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#D1D1D1;border-radius:4px;}@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
